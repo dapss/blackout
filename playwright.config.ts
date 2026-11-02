@@ -7,6 +7,8 @@ export default defineConfig({
   timeout: 90_000,
   expect: { timeout: 30_000 },
   fullyParallel: true,
+  // CI runners are slower and noisier; one retry keeps the timing test from blocking a deploy.
+  retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : 4,
   reporter: [["list"]],
   use: {

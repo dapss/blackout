@@ -6,7 +6,7 @@ Online tools like iLovePDF, Smallpdf or Acrobat online make you upload a documen
 
 Made by [Mochamad Daffa](https://github.com/dapss). Licensed under [Apache-2.0](LICENSE).
 
-> Live demo and demo GIF: coming with the first public release.
+**Try it: [blackout-redact.pages.dev](https://blackout-redact.pages.dev)**
 
 ## What it does
 

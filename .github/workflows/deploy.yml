@@ -1,0 +1,72 @@
+# Test every push to main, then deploy the static build to Cloudflare Pages
+# (https://blackout-redact.pages.dev). The deploy only runs if the tests pass.
+#
+# Needs, in the repo's Settings → Secrets and variables → Actions:
+#   secret   CLOUDFLARE_API_TOKEN   an API token with "Account · Cloudflare Pages · Edit" only
+#   variable CLOUDFLARE_ACCOUNT_ID  the Cloudflare account that owns the Pages project
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deploys at once; a newer push replaces a waiting one.
+concurrency:
+  group: deploy-pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps
+      - run: pnpm test:e2e
+        env:
+          CI: "true"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results
+          retention-days: 7
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://blackout-redact.pages.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Deploy to Cloudflare Pages
+        run: >
+          npx --yes wrangler@4.156.1 pages deploy dist
+          --project-name blackout-redact
+          --branch main
+          --commit-hash "$GITHUB_SHA"
+          --commit-message "$(git log -1 --format=%s)"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
