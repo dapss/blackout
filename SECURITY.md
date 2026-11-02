@@ -13,7 +13,7 @@
 - **Protection from a compromised device.** Malware, a malicious browser extension or a tampered browser can read anything on the page, including your document.
 - **That nothing can be inferred from what's left.** The length of a box, the text around it, or pixels right next to its edge can hint at what was covered. Draw boxes generously. Blackout adds a small pad around every box, but it can't judge context.
 - **Protection of the original file.** Blackout never modifies or deletes your original. Keep it safe or delete it yourself.
-- **Hosting you don't control.** If you use a copy hosted by someone else, you trust that host to serve the real code. For the strongest guarantee, build and serve it yourself, or check the network tab as described in the README.
+- **Hosting you don't control.** If you use a copy hosted by someone else, you trust that host to serve the real code. The official copy at blackout-redact.pages.dev can be checked: every file it serves is signed with GitHub build provenance, and `scripts/verify-live.sh` verifies the files you received (see "Verify this copy" in the README). That proves what *you* were served, not what someone else was. For the strongest guarantee, build and serve it yourself.
 
 ## Known limitations (v0.1)
 

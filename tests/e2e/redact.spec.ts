@@ -25,6 +25,11 @@ test("shows the privacy banner and the author credit", async ({ page }) => {
   await expect(footer.getByRole("link", { name: "Mochamad Daffa" })).toHaveAttribute("href", /github\.com\/dapss/);
   await expect(footer.getByRole("link", { name: "Source on GitHub" })).toBeVisible();
   await expect(footer.getByRole("link", { name: /Apache-2.0/ })).toBeVisible();
+  // The build shows which commit it came from, linked to the source.
+  const version = footer.getByTestId("build-version");
+  await expect(version).toHaveText(/^v\d+\.\d+\.\d+ · [0-9a-f]{7} \(verify\)$/);
+  await expect(version.getByRole("link").first()).toHaveAttribute("href", /github\.com\/dapss\/blackout\/commit\/[0-9a-f]{40}$/);
+  await expect(version.getByRole("link", { name: "verify" })).toHaveAttribute("href", /#verify-this-copy$/);
 });
 
 test("text PDF: the export has zero extractable text and nothing else from the original", async ({ page }) => {

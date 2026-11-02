@@ -1,4 +1,6 @@
 /// <reference types="vitest/config" />
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { buildCsp } from "./csp.config.ts";
@@ -45,7 +47,24 @@ function csp(): Plugin {
   };
 }
 
+/** The commit being built: GitHub Actions sets GITHUB_SHA; locally, ask git. */
+function buildCommit(): string {
+  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+  try {
+    return execSync("git rev-parse HEAD", { encoding: "utf8" }).trim();
+  } catch {
+    return "";
+  }
+}
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string };
+
 export default defineConfig({
+  // Shown in the footer so people can see exactly which code they are running.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_COMMIT__: JSON.stringify(buildCommit()),
+  },
   base: "./",
   plugins: [react(), csp()],
   worker: { format: "es" },

@@ -36,6 +36,26 @@ You don't have to trust this README:
 
 The end-to-end tests check points 1 to 3 automatically. See [SECURITY.md](SECURITY.md) for what Blackout does and doesn't guarantee.
 
+## Verify this copy
+
+The checks above cover what the page does. This one covers *which code* you got: that the files [blackout-redact.pages.dev](https://blackout-redact.pages.dev) serves were built from this repository, and not changed along the way.
+
+- **See the version.** The footer shows the version and commit, for example `v0.1.0 · 8eb4e01`, and links to that commit's source.
+- **Check the signatures.** Every deploy is built by [this repo's GitHub Actions workflow](.github/workflows/deploy.yml), which signs each file with GitHub's build provenance (Sigstore) before uploading it. With the [GitHub CLI](https://cli.github.com) installed:
+
+  ```bash
+  bash scripts/verify-live.sh
+  ```
+
+  It downloads the page, its script and stylesheet, and both workers, then checks each against the signatures on this repo and prints the commit it was built from. To check a single file by hand:
+
+  ```bash
+  curl -sO https://blackout-redact.pages.dev/favicon.svg
+  gh attestation verify favicon.svg --repo dapss/blackout
+  ```
+
+  A file that wasn't built by this workflow fails the check.
+
 ## Run it locally
 
 Requires Node.js 22+ and [pnpm](https://pnpm.io).

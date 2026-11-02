@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ACCEPT, type LoadedDoc, LoadError, loadDocument } from "../core/load";
 import { Editor } from "./Editor";
-import { AUTHOR_NAME, AUTHOR_URL, LICENSE_URL, REPO_URL } from "./site";
+import { APP_COMMIT, APP_VERSION, AUTHOR_NAME, AUTHOR_URL, COMMIT_URL, LICENSE_URL, REPO_URL, VERIFY_URL } from "./site";
 
 export function App() {
   const [doc, setDoc] = useState<LoadedDoc | null>(null);
@@ -128,6 +128,17 @@ export function App() {
         <a href={LICENSE_URL} rel="noopener noreferrer" target="_blank">
           Apache-2.0 license
         </a>
+        <span data-testid="build-version">
+          <a href={COMMIT_URL} rel="noopener noreferrer" target="_blank" title="The exact source code of this build">
+            v{APP_VERSION}
+            {APP_COMMIT && ` · ${APP_COMMIT.slice(0, 7)}`}
+          </a>{" "}
+          (
+          <a href={VERIFY_URL} rel="noopener noreferrer" target="_blank">
+            verify
+          </a>
+          )
+        </span>
       </footer>
     </div>
   );

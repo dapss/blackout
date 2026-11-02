@@ -66,6 +66,10 @@ jobs:
     environment:
       name: production
       url: https://blackout-redact.pages.dev
+    permissions:
+      contents: read
+      id-token: write # sign with GitHub's Sigstore identity
+      attestations: write # publish the signatures on the repo
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -75,6 +79,12 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      # Sign every file that is about to be served, so anyone can check that what the site gives
+      # them was built from this repo by this workflow: gh attestation verify <file> --repo dapss/blackout
+      - name: Sign build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/**
       - name: Deploy to Cloudflare Pages
         run: >
           npx --yes wrangler@4.156.1 pages deploy dist
