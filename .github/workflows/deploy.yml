@@ -21,8 +21,23 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Safari's engine (WebKit) is tested on macOS: Safari only ships on Apple platforms, and
+    # Playwright's Linux WebKit build draws canvases in software, about 6x slower than real Safari.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Chromium and Firefox
+            os: ubuntu-latest
+            browsers: chromium firefox
+            projects: --project=chromium --project=firefox --project=mobile-chrome
+          - name: WebKit (Safari)
+            os: macos-latest
+            browsers: webkit
+            projects: --project=webkit --project=mobile-safari
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
@@ -33,14 +48,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
-      - run: pnpm exec playwright install --with-deps
-      - run: pnpm test:e2e
+      - run: pnpm exec playwright install --with-deps ${{ matrix.browsers }}
+      - run: pnpm test:e2e ${{ matrix.projects }}
         env:
           CI: "true"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.os }}
           path: test-results
           retention-days: 7
 
