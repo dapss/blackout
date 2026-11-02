@@ -13,8 +13,12 @@ async function tabTo(
   match: (el: { text: string; label: string; testid: string; role: string }) => boolean,
   back = false,
 ) {
+  // Safari's Tab skips buttons unless a setting is on; Option+Tab reaches every control, as
+  // keyboard users there do.
+  const webkit = page.context().browser()?.browserType().name() === "webkit";
+  const key = `${webkit ? "Alt+" : ""}${back ? "Shift+" : ""}Tab`;
   for (let i = 0; i < 40; i++) {
-    await page.keyboard.press(back ? "Shift+Tab" : "Tab");
+    await page.keyboard.press(key);
     const el = await page.evaluate(() => {
       const a = document.activeElement as HTMLElement;
       return {
