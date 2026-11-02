@@ -1,0 +1,14 @@
+Blackout
+Copyright 2026 Mochamad Daffa
+https://github.com/dapss
+
+This product includes software developed by Mochamad Daffa.
+
+Licensed under the Apache License, Version 2.0 (see LICENSE). If you redistribute
+this software or a derivative of it, keep this NOTICE file with it, as required
+by section 4(d) of the license.
+
+Third-party components bundled in the built app:
+- PDF.js (pdfjs-dist), Copyright Mozilla Foundation, Apache License 2.0
+- pdf-lib, Copyright Andrew Dillon, MIT License
+- React and React DOM, Copyright Meta Platforms, Inc. and affiliates, MIT License
