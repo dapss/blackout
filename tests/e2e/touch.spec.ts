@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 
 test("there is no separate scroll mode, and touch users get a hint", async ({ page }) => {
   await expect(page.getByRole("radio", { name: "Scroll" })).toHaveCount(0);
-  await expect(page.getByTestId("stage-hint")).toContainText("Use two fingers to scroll");
+  await expect(page.getByTestId("stage-hint")).toContainText("Pinch to zoom, two fingers to scroll");
 });
 
 test("one finger draws a box", async ({ page }) => {
@@ -51,9 +51,18 @@ test("one finger draws a box", async ({ page }) => {
 
 test("two fingers scroll the page and draw nothing", async ({ page }) => {
   const cdp = await page.context().newCDPSession(page);
-  await page.evaluate(() => window.scrollTo(0, 0));
+  // Zoom in first: at Fit width the page nearly fits the phone screen, leaving little to scroll.
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Zoom in" }).click();
+  }
+  await page.evaluate(() => {
+    window.scrollTo(0, 0);
+    document.querySelector(".stage")!.scrollTop = 0;
+  });
   const r = (await page.getByTestId("page-layer").boundingBox())!;
-  const y0 = Math.min(r.y + r.height - 20, 640);
+  // Start above the bottom toolbar, on the page.
+  const y0 = Math.min(r.y + r.height - 20, 520);
   const start = [
     { x: r.x + 100, y: y0 },
     { x: r.x + 200, y: y0 },
@@ -64,11 +73,11 @@ test("two fingers scroll the page and draw nothing", async ({ page }) => {
   await touch(cdp, "touchStart", [start[0]!]);
   await swipe(cdp, [start[0]!], [{ x: start[0]!.x + 30, y: start[0]!.y - 20 }], 2);
   await touch(cdp, "touchStart", [{ x: start[0]!.x + 30, y: start[0]!.y - 20 }, start[1]!]);
-  const before = await page.evaluate(() => window.scrollY);
+  const before = await page.evaluate(() => window.scrollY + document.querySelector(".stage")!.scrollTop);
   await swipe(cdp, [{ x: start[0]!.x + 30, y: start[0]!.y - 20 }, start[1]!], [{ x: end[0]!.x + 30, y: end[0]!.y - 20 }, end[1]!]);
   await touch(cdp, "touchEnd", []);
 
-  const after = await page.evaluate(() => window.scrollY);
+  const after = await page.evaluate(() => window.scrollY + document.querySelector(".stage")!.scrollTop);
   expect(after - before).toBeGreaterThan(100);
   await expect(page.getByTestId("box")).toHaveCount(0);
 });
@@ -94,4 +103,67 @@ test("a second finger during a box move cancels the move", async ({ page }) => {
   const after = (await box.boundingBox())!;
   expect(after.x).toBeCloseTo(before.x, 0);
   expect(after.y).toBeCloseTo(before.y, 0);
+});
+
+test("pinching zooms in around the fingers", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const r = await layerBox(page);
+  // Pinch around a point near the middle of the page, so scrolling can keep it under the fingers.
+  const mid = { x: r.x + r.width * 0.5, y: Math.min(r.y + 150, 500) };
+  const pageX = (mid.x - r.x) / r.width;
+  const pageY = (mid.y - r.y) / r.height;
+
+  const at = (spread: number): Pt[] => [
+    { x: mid.x - spread / 2, y: mid.y },
+    { x: mid.x + spread / 2, y: mid.y },
+  ];
+  await touch(cdp, "touchStart", at(60));
+  for (let s = 70; s <= 180; s += 10) await touch(cdp, "touchMove", at(s));
+  await touch(cdp, "touchEnd", []);
+
+  await expect.poll(async () => (await page.getByTestId("page-layer").boundingBox())!.width).toBeGreaterThan(r.width * 2.5);
+  const z = (await page.getByTestId("page-layer").boundingBox())!;
+  // The page point that was under the fingers is still (roughly) under them.
+  expect(Math.abs(z.x + pageX * z.width - mid.x)).toBeLessThan(30);
+  expect(Math.abs(z.y + pageY * z.height - mid.y)).toBeLessThan(30);
+  await expect(page.getByTestId("box")).toHaveCount(0);
+});
+
+test("double-tap zooms in, and again zooms back to fit", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const r = await layerBox(page);
+  const p = { x: r.x + r.width * 0.5, y: r.y + 120 };
+  const doubleTap = async () => {
+    for (let i = 0; i < 2; i++) {
+      await touch(cdp, "touchStart", [p]);
+      await touch(cdp, "touchEnd", []);
+    }
+  };
+  const width = async () => (await page.getByTestId("page-layer").boundingBox())!.width;
+
+  await doubleTap();
+  await expect.poll(width).toBeGreaterThan(r.width * 2);
+  await doubleTap();
+  await expect.poll(width).toBeCloseTo(r.width, 0);
+  await expect(page.getByTestId("box")).toHaveCount(0);
+});
+
+test("in Words, taps still redact, including quick taps on different words", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  await page.getByRole("radio", { name: "Words" }).click();
+  const word = (text: string) => page.locator(`[data-testid="word"][data-word="${text}"]`).first();
+  await expect(word("123-45-6789")).toHaveCount(1);
+  const tap = async (text: string) => {
+    const b = (await word(text).boundingBox())!;
+    const p = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    await touch(cdp, "touchStart", [p]);
+    await touch(cdp, "touchEnd", []);
+  };
+
+  await tap("123-45-6789");
+  await expect(page.getByTestId("box")).toHaveCount(1);
+  // Two different words in quick succession: neither tap is lost.
+  await tap("SSN");
+  await tap("Quarterly");
+  await expect(page.getByTestId("box")).toHaveCount(3);
 });

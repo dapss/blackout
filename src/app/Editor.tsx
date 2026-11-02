@@ -1,20 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { moveRect } from "../core/geometry";
 import type { LoadedDoc } from "../core/load";
 import type { Box } from "../core/types";
 import { ExportDialog } from "./ExportDialog";
 import { commit, type History, initHistory, redo, removeBox, removePageBoxes, undo, updateBox } from "./history";
 import { PageView, type Tool } from "./PageView";
+import { PhoneBottomBar, PhoneTopBar } from "./PhoneBars";
+import { scrollAncestorsBy } from "./scroll";
 import { Thumbnails } from "./Thumbnails";
 
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3, 4];
+const MAX_ZOOM = 6;
+/** Double-tap zooms in to this multiple of the fit-to-width zoom. */
+const DOUBLE_TAP_ZOOM = 2.5;
 
 function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   return !!t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
 }
 
-export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: boolean) => void }) {
+interface Props {
+  doc: LoadedDoc;
+  /** Phone layout: full-screen page with bars, instead of the desktop toolbar. */
+  phone: boolean;
+  onDirty: (dirty: boolean) => void;
+  onOpenFile: () => void;
+  onClose: () => void;
+}
+
+export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   const [history, setHistory] = useState<History<Box[]>>(() => initHistory([]));
   const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -26,6 +40,8 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
   const [touch] = useState(() => window.matchMedia?.("(pointer: coarse)").matches ?? false);
   const [exporting, setExporting] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
+  /** Page point that should stay under a screen point after the next zoom change. */
+  const zoomAnchor = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null);
 
   const boxes = history.present;
   const size = doc.pages[page]!;
@@ -48,14 +64,52 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
     const el = stageRef.current;
     if (!el) return;
     const update = () => {
-      const avail = el.clientWidth - 32;
+      const avail = el.clientWidth - (phone ? 16 : 32);
       setFitZoom(Math.max(0.1, Math.min(2, avail / size.width)));
     };
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [size.width]);
+  }, [size.width, phone]);
+
+  const layer = () => stageRef.current?.querySelector<HTMLElement>("[data-testid='page-layer']") ?? null;
+
+  /** Zoom, keeping the page point under (cx, cy) on screen where it is (the stage centre by default). */
+  const zoomTo = useCallback(
+    (target: number | "fit", cx?: number, cy?: number) => {
+      const el = layer();
+      const stage = stageRef.current;
+      if (el && stage) {
+        const r = el.getBoundingClientRect();
+        const s = stage.getBoundingClientRect();
+        const x = cx ?? (Math.max(r.left, s.left) + Math.min(r.right, s.right)) / 2;
+        const y = cy ?? (Math.max(r.top, s.top) + Math.min(r.bottom, s.bottom)) / 2;
+        zoomAnchor.current = { px: (x - r.left) / zoom, py: (y - r.top) / zoom, cx: x, cy: y };
+      }
+      if (target === "fit") setZoomMode("fit");
+      else setZoomMode(Math.max(Math.min(0.25, fitZoom), Math.min(MAX_ZOOM, target)));
+    },
+    [zoom, fitZoom],
+  );
+
+  // After the page has been laid out at the new zoom, scroll so the anchor point stays put.
+  useLayoutEffect(() => {
+    const a = zoomAnchor.current;
+    zoomAnchor.current = null;
+    const el = layer();
+    if (!a || !el) return;
+    const r = el.getBoundingClientRect();
+    scrollAncestorsBy(el, r.left + a.px * zoom - a.cx, r.top + a.py * zoom - a.cy);
+  }, [zoom]);
+
+  const onDoubleTap = useCallback(
+    (cx: number, cy: number) => {
+      if (zoom > fitZoom * 1.2) zoomTo("fit", cx, cy);
+      else zoomTo(fitZoom * DOUBLE_TAP_ZOOM, cx, cy);
+    },
+    [zoom, fitZoom, zoomTo],
+  );
 
   const goTo = useCallback(
     (p: number) => {
@@ -65,10 +119,11 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
     [doc.pages.length],
   );
 
+  // Each step changes the size by at least ~15%, even from an in-between zoom like Fit.
   const stepZoom = (dir: 1 | -1) => {
     const next =
-      dir > 0 ? ZOOM_STEPS.find((z) => z > zoom + 0.001) : [...ZOOM_STEPS].reverse().find((z) => z < zoom - 0.001);
-    if (next) setZoomMode(next);
+      dir > 0 ? ZOOM_STEPS.find((z) => z > zoom * 1.15) : [...ZOOM_STEPS].reverse().find((z) => z < zoom / 1.15);
+    if (next) zoomTo(next);
   };
 
   const doUndo = useCallback(() => setHistory(undo), []);
@@ -78,6 +133,7 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
     change(removeBox(history.present, selectedId));
     setSelectedId(null);
   }, [selectedId, history.present, change]);
+  const clearPage = () => change(removePageBoxes(boxes, page));
 
   // Keep the selection valid after undo/redo.
   useEffect(() => {
@@ -119,6 +175,86 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
   }, [exporting, selectedId, boxes, doc.pages, page, change, doUndo, doRedo, deleteSelected, goTo]);
 
   const multi = doc.pages.length > 1;
+  const wordsTitle =
+    doc.kind === "pdf" ? "Click or drag across words to black them out" : "Images have no text layer, so use Draw";
+
+  const hint =
+    tool === "words" && wordCount === 0
+      ? "This page has no selectable text (it may be a scan). Use Draw to cover things by hand."
+      : tool === "words" && boxes.length === 0
+        ? phone
+          ? "Tap a word to black it out, or drag across several words."
+          : "Click a word to black it out, or drag across several words."
+        : boxes.length === 0
+          ? "Drag across anything sensitive to black it out."
+          : phone
+            ? `${boxes.length} box${boxes.length === 1 ? "" : "es"}. Drag a box to move it.`
+            : `${boxes.length} box${boxes.length === 1 ? "" : "es"} in total. Drag a box to move it, pull its handles to resize.`;
+
+  const stage = (
+    <div className="stage" ref={stageRef}>
+      <p className="hint stage-hint" data-testid="stage-hint">
+        {touch && "Pinch to zoom, two fingers to scroll. "}
+        {hint}
+      </p>
+      <PageView
+        doc={doc}
+        pageIndex={page}
+        zoom={zoom}
+        tool={tool}
+        peek={peek}
+        boxes={boxes}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        onChange={change}
+        onWordCount={setWordCount}
+        onPinchZoom={zoomTo}
+        onDoubleTap={onDoubleTap}
+      />
+    </div>
+  );
+
+  const dialog = exporting && <ExportDialog doc={doc} boxes={boxes} onClose={() => setExporting(false)} />;
+
+  if (phone) {
+    return (
+      <div className="editor phone">
+        <PhoneTopBar
+          doc={doc}
+          page={page}
+          counts={counts}
+          zoomMode={zoomMode}
+          zoom={zoom}
+          peek={peek}
+          canClearPage={pageBoxes.length > 0}
+          onClose={onClose}
+          onExport={() => setExporting(true)}
+          onGoTo={goTo}
+          onZoom={(z) => (z === "in" ? stepZoom(1) : z === "out" ? stepZoom(-1) : zoomTo("fit"))}
+          onPeek={setPeek}
+          onClearPage={clearPage}
+          onOpenFile={onOpenFile}
+        />
+        {stage}
+        <PhoneBottomBar
+          doc={doc}
+          tool={tool}
+          wordsTitle={wordsTitle}
+          canUndo={history.past.length > 0}
+          canRedo={history.future.length > 0}
+          selected={!!selectedId}
+          page={page}
+          counts={counts}
+          onTool={setTool}
+          onUndo={doUndo}
+          onRedo={doRedo}
+          onDelete={deleteSelected}
+          onGoTo={goTo}
+        />
+        {dialog}
+      </div>
+    );
+  }
 
   return (
     <div className={`editor${multi ? " has-thumbs" : ""}`}>
@@ -134,11 +270,7 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
               aria-checked={tool === "words"}
               onClick={() => setTool("words")}
               disabled={doc.kind !== "pdf"}
-              title={
-                doc.kind === "pdf"
-                  ? "Click or drag across words to black them out"
-                  : "Images have no text layer, so use Draw"
-              }
+              title={wordsTitle}
             >
               Words
             </button>
@@ -158,12 +290,7 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
           <button type="button" className="btn" onClick={deleteSelected} disabled={!selectedId} title="Delete (Del)">
             Delete
           </button>
-          <button
-            type="button"
-            className="btn"
-            onClick={() => change(removePageBoxes(boxes, page))}
-            disabled={!pageBoxes.length}
-          >
+          <button type="button" className="btn" onClick={clearPage} disabled={!pageBoxes.length}>
             Clear page
           </button>
         </div>
@@ -192,7 +319,7 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
             <button type="button" className="btn icon" onClick={() => stepZoom(-1)} aria-label="Zoom out">
               −
             </button>
-            <button type="button" className="btn zoom-label" onClick={() => setZoomMode("fit")} title="Fit to width">
+            <button type="button" className="btn zoom-label" onClick={() => zoomTo("fit")} title="Fit to width">
               {zoomMode === "fit" ? "Fit" : `${Math.round(zoom * 100)}%`}
             </button>
             <button type="button" className="btn icon" onClick={() => stepZoom(1)} aria-label="Zoom in">
@@ -212,32 +339,8 @@ export function Editor({ doc, onDirty }: { doc: LoadedDoc; onDirty: (dirty: bool
 
       {multi && <Thumbnails doc={doc} current={page} counts={counts} onSelect={goTo} />}
 
-      <div className="stage" ref={stageRef}>
-        <p className="hint stage-hint" data-testid="stage-hint">
-          {touch && "Use two fingers to scroll. "}
-          {tool === "words" && wordCount === 0
-            ? "This page has no selectable text (it may be a scan). Use Draw to cover things by hand."
-            : tool === "words" && boxes.length === 0
-              ? "Click a word to black it out, or drag across several words."
-              : boxes.length === 0
-                ? "Drag across anything sensitive to black it out."
-                : `${boxes.length} box${boxes.length === 1 ? "" : "es"} in total. Drag a box to move it, pull its handles to resize.`}
-        </p>
-        <PageView
-          doc={doc}
-          pageIndex={page}
-          zoom={zoom}
-          tool={tool}
-          peek={peek}
-          boxes={boxes}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          onChange={change}
-          onWordCount={setWordCount}
-        />
-      </div>
-
-      {exporting && <ExportDialog doc={doc} boxes={boxes} onClose={() => setExporting(false)} />}
+      {stage}
+      {dialog}
     </div>
   );
 }

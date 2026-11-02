@@ -20,7 +20,13 @@ async function toScreen(page: Page, x: number, y: number, pageWidth = PAGE_W) {
   const vh = page.viewportSize()!.height;
   const screenY = r.y + y * s;
   if (screenY < 40 || screenY > vh - 40) {
-    await page.evaluate((dy) => window.scrollBy(0, dy), screenY - vh / 2);
+    await page.evaluate((dy) => {
+      // Phones scroll inside the stage, desktops scroll the window.
+      const stage = document.querySelector(".stage")!;
+      const before = stage.scrollTop;
+      stage.scrollBy(0, dy);
+      window.scrollBy(0, dy - (stage.scrollTop - before));
+    }, screenY - vh / 2);
     r = (await page.getByTestId("page-layer").boundingBox())!;
   }
   return { x: r.x + x * s, y: r.y + y * s };
@@ -142,6 +148,8 @@ test.describe("on a plain PDF", () => {
     const num = await secretSpan("SSN ", SECRET);
     const p = await toScreen(page, (num.x0 + num.x1) / 2, BASELINE - 6);
     await page.mouse.click(p.x, p.y);
+    // Wait for the box before tapping again: on touch, two quick taps on one spot are a double-tap zoom.
+    await expect(page.getByTestId("box")).toHaveCount(1);
     await page.keyboard.press("Escape");
     await expect(page.locator(".box.selected")).toHaveCount(0);
     await page.mouse.click(p.x, p.y);

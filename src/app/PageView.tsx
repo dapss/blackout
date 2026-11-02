@@ -5,21 +5,17 @@ import { canvasSize, createCanvas, get2d, releaseCanvas } from "../core/render";
 import type { Box, Rect, ResizeHandle } from "../core/types";
 import { type Word, wordAt, wordBox, lineRects, wordsInRect } from "../core/words";
 import { addBox, newBoxId, updateBox } from "./history";
+import { scrollAncestorsBy } from "./scroll";
 
 export type Tool = "draw" | "words";
 
 const HANDLES: ResizeHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-/** Scroll the nearest scrollable ancestors (the stage, then the page) by a pixel delta. */
-function scrollAncestorsBy(el: HTMLElement, dx: number, dy: number): void {
-  for (let n = el.parentElement; n && (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5); n = n.parentElement) {
-    const left = n.scrollLeft;
-    const top = n.scrollTop;
-    n.scrollBy({ left: dx, top: dy, behavior: "instant" });
-    dx -= n.scrollLeft - left;
-    dy -= n.scrollTop - top;
-  }
-}
+/** Two taps closer than this (ms, screen px) are a double-tap. */
+const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_PX = 30;
+/** While zoom is changing (pinch), re-render the page this long after it settles; it stretches meanwhile. */
+const RENDER_SETTLE_MS = 150;
 
 type Drag =
   | { mode: "draw"; x0: number; y0: number }
@@ -39,6 +35,9 @@ interface Props {
   onChange: (boxes: Box[]) => void;
   /** Reports how many words the current page's text layer has (null while loading). */
   onWordCount?: (count: number | null) => void;
+  /** Pinch: zoom to `zoom`, keeping the page point under (cx, cy) in place. */
+  onPinchZoom?: (zoom: number, cx: number, cy: number) => void;
+  onDoubleTap?: (cx: number, cy: number) => void;
 }
 
 export function PageView({
@@ -52,6 +51,8 @@ export function PageView({
   onSelect,
   onChange,
   onWordCount,
+  onPinchZoom,
+  onDoubleTap,
 }: Props) {
   const size = doc.pages[pageIndex]!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -59,6 +60,7 @@ export function PageView({
   const drag = useRef<Drag | null>(null);
   /** Live geometry while a pointer is down; committed to history on release. */
   const [draft, setDraft] = useState<{ id: string | null; rect: Rect } | null>(null);
+  /** True until this page has been drawn once; later re-renders (zoom) keep the old pixels showing. */
   const [rendering, setRendering] = useState(true);
   const [words, setWords] = useState<Word[] | null>(null);
   const [hover, setHover] = useState<Word | null>(null);
@@ -80,16 +82,26 @@ export function PageView({
     };
   }, [doc, pageIndex, tool, onWordCount]);
 
+  // The canvas is re-rendered at renderZoom; during a pinch the page stretches to the live zoom and
+  // only re-renders once the fingers settle, so the gesture stays smooth.
+  const [renderZoom, setRenderZoom] = useState(zoom);
+  useEffect(() => {
+    if (zoom === renderZoom) return;
+    const t = setTimeout(() => setRenderZoom(zoom), RENDER_SETTLE_MS);
+    return () => clearTimeout(t);
+  }, [zoom, renderZoom]);
+
+  useEffect(() => setRendering(true), [doc, pageIndex]);
+
   // Render off-screen, then copy, so a slow render never leaves a half-drawn page on screen.
   useEffect(() => {
     const visible = canvasRef.current;
     if (!visible) return;
     const ac = new AbortController();
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const scale = zoom * dpr;
+    const scale = renderZoom * dpr;
     const { w, h } = canvasSize(size, scale);
     const off = createCanvas(w, h);
-    setRendering(true);
     doc
       .draw(pageIndex, get2d(off), scale, ac.signal)
       .then(() => {
@@ -104,7 +116,7 @@ export function PageView({
       })
       .finally(() => releaseCanvas(off));
     return () => ac.abort();
-  }, [doc, pageIndex, zoom, size]);
+  }, [doc, pageIndex, renderZoom, size]);
 
   const toPage = (e: React.PointerEvent): { x: number; y: number } => {
     const r = layerRef.current!.getBoundingClientRect();
@@ -127,9 +139,19 @@ export function PageView({
     }
   };
 
-  // Touch: one finger draws or selects words, two fingers scroll. There is no separate scroll mode.
+  // Touch: one finger draws or selects words; two fingers scroll and pinch-zoom. No separate modes.
   const touches = useRef(new Map<number, { x: number; y: number }>());
   const panFrom = useRef<{ x: number; y: number } | null>(null);
+  const pinch = useRef<{ d0: number; z0: number } | null>(null);
+  const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
+  /** A word tap waiting to see whether a second tap makes it a double-tap. */
+  const pendingTap = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
+  useEffect(() => () => clearTimeout(pendingTap.current?.timer), []);
+
+  const fingerSpread = () => {
+    const [a, b] = [...touches.current.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+  };
 
   const touchMidpoint = () => {
     let x = 0;
@@ -153,6 +175,7 @@ export function PageView({
     drag.current = null;
     setDraft(null);
     panFrom.current = touchMidpoint();
+    pinch.current = { d0: fingerSpread(), z0: zoom };
   };
 
   /** Returns true when the event belonged to a two-finger scroll. */
@@ -164,12 +187,21 @@ export function PageView({
       const m = touchMidpoint();
       scrollAncestorsBy(layerRef.current!, panFrom.current.x - m.x, panFrom.current.y - m.y);
       panFrom.current = m;
+      const pz = pinch.current;
+      const d = fingerSpread();
+      if (pz && pz.d0 > 0 && d > 0 && onPinchZoom) {
+        const next = pz.z0 * (d / pz.d0);
+        if (Math.abs(next - zoom) / zoom > 0.01) onPinchZoom(next, m.x, m.y);
+      }
       return true;
     }
     touches.current.delete(e.pointerId);
     if (!panFrom.current) return false;
     // Lifting a finger ends the scroll; the remaining finger does nothing until it lifts too.
-    if (touches.current.size === 0) panFrom.current = null;
+    if (touches.current.size === 0) {
+      panFrom.current = null;
+      pinch.current = null;
+    }
     return true;
   };
 
@@ -207,6 +239,25 @@ export function PageView({
     }
   };
 
+  /**
+   * A tap on touch. Returns true when it completed a double-tap (zoom), which the caller then
+   * doesn't treat as a tap.
+   */
+  const isDoubleTap = (e: React.PointerEvent): boolean => {
+    if (e.pointerType !== "touch" || !onDoubleTap) return false;
+    const now = performance.now();
+    const prev = lastTap.current;
+    if (prev && now - prev.t < DOUBLE_TAP_MS && Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < DOUBLE_TAP_PX) {
+      lastTap.current = null;
+      clearTimeout(pendingTap.current?.timer);
+      pendingTap.current = null;
+      onDoubleTap(e.clientX, e.clientY);
+      return true;
+    }
+    lastTap.current = { t: now, x: e.clientX, y: e.clientY };
+    return false;
+  };
+
   /** Click a word: black it out, or select the box that already covers it. */
   const redactWordAt = (x: number, y: number) => {
     const word = words && wordAt(words, x, y);
@@ -223,6 +274,10 @@ export function PageView({
     // Not selected afterwards: its handles would cover neighbouring words and catch the next tap.
     onChange(addBox(boxes, { id: newBoxId(), page: pageIndex, ...wordBox(word, size) }));
   };
+
+  // Delayed taps call the latest version, so they see the boxes as they are when they fire.
+  const redactRef = useRef(redactWordAt);
+  redactRef.current = redactWordAt;
 
   /** Drag across words: one box per line, so the gaps between words are covered too. */
   const redactWordsIn = (r: Rect) => {
@@ -242,10 +297,24 @@ export function PageView({
     // Use the release point itself: the last pointermove may not have rendered yet.
     const current = e.type === "pointercancel" ? null : rectAt(d, e);
     if (!current) return;
+    const tiny = current.rect.w * zoom < 4 && current.rect.h * zoom < 4;
+    if ((d.mode === "sweep" || d.mode === "draw") && tiny && isDoubleTap(e)) return;
     if (d.mode === "sweep") {
-      const tiny = current.rect.w * zoom < 4 && current.rect.h * zoom < 4;
-      if (tiny) redactWordAt(d.x0, d.y0);
-      else redactWordsIn(current.rect);
+      if (!tiny) redactWordsIn(current.rect);
+      else if (e.pointerType === "touch" && onDoubleTap) {
+        // Wait briefly: a second tap on the same spot turns this into a double-tap zoom instead.
+        // A tap elsewhere first completes the earlier one.
+        const prev = pendingTap.current;
+        if (prev) {
+          clearTimeout(prev.timer);
+          redactRef.current(prev.x, prev.y);
+        }
+        const timer = setTimeout(() => {
+          pendingTap.current = null;
+          redactRef.current(d.x0, d.y0);
+        }, DOUBLE_TAP_MS);
+        pendingTap.current = { timer, x: d.x0, y: d.y0 };
+      } else redactWordAt(d.x0, d.y0);
     } else if (d.mode === "draw") {
       // Ignore clicks and tiny accidental drags (under ~4 screen pixels).
       if (!isUsableRect(current.rect) || current.rect.w * zoom < 4 || current.rect.h * zoom < 4) return;

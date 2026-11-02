@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ACCEPT, type LoadedDoc, LoadError, loadDocument } from "../core/load";
 import { Editor } from "./Editor";
+import { PrivacyBanner } from "./Privacy";
+import { PHONE_QUERY, useMediaQuery } from "./scroll";
 import { APP_COMMIT, APP_VERSION, AUTHOR_NAME, AUTHOR_URL, COMMIT_URL, LICENSE_URL, REPO_URL, VERIFY_URL } from "./site";
 
 export function App() {
@@ -10,6 +12,9 @@ export function App() {
   const [dragging, setDragging] = useState(false);
   const dirty = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const phone = useMediaQuery(PHONE_QUERY);
+  // On a phone the open document gets the whole screen; the editor draws its own bars.
+  const phoneEditing = !!doc && phone;
   const setDirty = useCallback((d: boolean) => {
     dirty.current = d;
   }, []);
@@ -59,8 +64,18 @@ export function App() {
 
   const chooseFile = () => inputRef.current?.click();
 
+  const close = useCallback(() => {
+    if (dirty.current && !window.confirm("Close this file? Your boxes will be lost.")) return;
+    dirty.current = false;
+    setDoc((prev) => {
+      prev?.destroy();
+      return null;
+    });
+  }, []);
+
   return (
-    <div className={`app${dragging ? " is-dragging" : ""}`}>
+    <div className={`app${dragging ? " is-dragging" : ""}${phoneEditing ? " phone-editing" : ""}`}>
+      {!phoneEditing && (
       <header className="topbar">
         <a className="brand" href="./" aria-label="Blackout home">
           <span className="brand-mark" aria-hidden="true">
@@ -76,8 +91,9 @@ export function App() {
           </button>
         )}
       </header>
+      )}
 
-      <PrivacyBanner />
+      {!phoneEditing && <PrivacyBanner />}
 
       <input
         ref={inputRef}
@@ -99,7 +115,14 @@ export function App() {
 
       <main className="main">
         {doc ? (
-          <Editor key={doc.name + doc.pages.length} doc={doc} onDirty={setDirty} />
+          <Editor
+            key={doc.name + doc.pages.length}
+            doc={doc}
+            phone={phone}
+            onDirty={setDirty}
+            onOpenFile={chooseFile}
+            onClose={close}
+          />
         ) : (
           <section className="dropzone" aria-busy={loading}>
             <h1>Redact documents without uploading them</h1>
@@ -115,6 +138,7 @@ export function App() {
         )}
       </main>
 
+      {!phoneEditing && (
       <footer className="footer">
         <span>
           Made by{" "}
@@ -140,36 +164,7 @@ export function App() {
           )
         </span>
       </footer>
+      )}
     </div>
-  );
-}
-
-function PrivacyBanner() {
-  return (
-    <details className="privacy" data-testid="privacy-banner">
-      <summary>
-        <strong>Your file never leaves this device.</strong> Everything runs in your browser. Nothing is uploaded or
-        stored. <span className="link">How to verify</span>
-      </summary>
-      <div className="privacy-body">
-        <ol>
-          <li>
-            After this page has loaded, turn off Wi-Fi or switch to airplane mode. Blackout keeps working, because it
-            never needs the network.
-          </li>
-          <li>
-            Or open your browser's developer tools (F12), go to the <em>Network</em> tab, then open and export a file.
-            No request is made.
-          </li>
-          <li>
-            The page's Content Security Policy sets <code>connect-src 'self'</code>, so the browser itself refuses to
-            send data to any other server.
-          </li>
-          <li>
-            The code is open source. You can read it, build it yourself and compare.
-          </li>
-        </ol>
-      </div>
-    </details>
   );
 }

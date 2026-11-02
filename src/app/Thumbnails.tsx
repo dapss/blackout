@@ -9,10 +9,12 @@ interface Props {
   current: number;
   counts: number[];
   onSelect: (page: number) => void;
+  /** "rail": the desktop side column (and phone strip); "grid": inside the phone Pages sheet. */
+  layout?: "rail" | "grid";
 }
 
 /** Page strip. Thumbnails render one at a time so a long PDF never holds many canvases at once. */
-export function Thumbnails({ doc, current, counts, onSelect }: Props) {
+export function Thumbnails({ doc, current, counts, onSelect, layout = "rail" }: Props) {
   const [urls, setUrls] = useState<(string | undefined)[]>([]);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export function Thumbnails({ doc, current, counts, onSelect }: Props) {
   }, [doc]);
 
   return (
-    <nav className="thumbs" aria-label="Pages">
+    <nav className={layout === "grid" ? "thumbs-grid" : "thumbs"} aria-label="Pages">
       <ol>
         {doc.pages.map((size, i) => (
           <li key={i}>
