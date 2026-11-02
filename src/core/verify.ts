@@ -64,13 +64,12 @@ function nameOf(dict: PDFDict, key: string): string | undefined {
   return v instanceof PDFName ? v.decodeText() : undefined;
 }
 
+/** Count an ASCII needle in raw bytes, using the engine's native string search. */
 function countOccurrences(bytes: Uint8Array, needle: string): number {
-  const n = [...needle].map((c) => c.charCodeAt(0));
+  // latin1 maps every byte to one character, so offsets and ASCII matches are preserved.
+  const text = new TextDecoder("latin1").decode(bytes);
   let count = 0;
-  outer: for (let i = 0; i <= bytes.length - n.length; i++) {
-    for (let j = 0; j < n.length; j++) if (bytes[i + j] !== n[j]) continue outer;
-    count++;
-  }
+  for (let i = text.indexOf(needle); i !== -1; i = text.indexOf(needle, i + needle.length)) count++;
   return count;
 }
 
@@ -204,6 +203,8 @@ export interface VerifyInput {
 
 export interface VerifyDeps {
   pdfjs?: PdfjsLib;
+  /** Run the structural check elsewhere (the browser uses the export worker to keep the UI free). */
+  inspectStructure?: typeof inspectPdfStructure;
   /** Extra pdf.js getDocument options (offline settings in the browser). */
   pdfjsOptions?: Record<string, unknown>;
   rasterizePdfPage?: PdfRasterizer;
@@ -237,7 +238,7 @@ export async function verifyExport(input: VerifyInput, deps: VerifyDeps): Promis
 
 async function verifyPdf(input: VerifyInput, deps: VerifyDeps): Promise<VerifyReport> {
   if (!deps.pdfjs) throw new Error("verifyPdf needs pdf.js");
-  const findings = await inspectPdfStructure(input.bytes, input.pageCount);
+  const findings = await (deps.inspectStructure ?? inspectPdfStructure)(input.bytes, input.pageCount);
 
   const task = deps.pdfjs.getDocument({ data: input.bytes.slice(), ...deps.pdfjsOptions });
   let textItems = 0;

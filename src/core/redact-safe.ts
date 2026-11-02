@@ -3,6 +3,7 @@ import { toPixelRect } from "./geometry";
 import type { LoadedDoc } from "./load";
 import { type Any2D, type AnyCanvas, canvasSize, createCanvas, fitScale, get2d, releaseCanvas } from "./render";
 import type { Box, DocKind, Rect } from "./types";
+import { inspectPdfStructure } from "./verify";
 
 export const DEFAULT_DPI = 200;
 /** Extra pixels painted around every box, so anti-aliased glyph edges can't peek out. */
@@ -149,6 +150,38 @@ class WorkerSink implements PageSink {
       if (sharedWorker === this.worker) sharedWorker = null;
     }
   }
+}
+
+let nextInspectId = 0;
+
+/**
+ * Structural check of an exported PDF (pdf-lib re-parse plus a revision count) in the export
+ * worker, so a large file never blocks the page. Runs inline where workers aren't available.
+ */
+export function inspectStructureInWorker(bytes: Uint8Array, pages: number): Promise<Record<string, string[]>> {
+  warmExportWorker();
+  const worker = sharedWorker;
+  if (!worker) return inspectPdfStructure(bytes, pages);
+  const id = ++nextInspectId;
+  return new Promise((resolve, reject) => {
+    const onMessage = (e: MessageEvent<WorkerReply>) => {
+      if (e.data.type !== "inspected" || e.data.id !== id) return;
+      cleanup();
+      resolve(e.data.findings);
+    };
+    const onError = (e: ErrorEvent) => {
+      cleanup();
+      reject(new Error(e.message || "Export worker failed."));
+    };
+    const cleanup = () => {
+      worker.removeEventListener("message", onMessage);
+      worker.removeEventListener("error", onError);
+    };
+    worker.addEventListener("message", onMessage);
+    worker.addEventListener("error", onError);
+    const copy = bytes.slice();
+    worker.postMessage({ type: "inspect", id, bytes: copy, pages } satisfies WorkerRequest, [copy.buffer]);
+  });
 }
 
 export function workerExportSupported(): boolean {

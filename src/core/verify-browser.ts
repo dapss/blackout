@@ -1,5 +1,5 @@
 import { OFFLINE_DOC_OPTIONS, pdfjs, startPdfWorker } from "./pdfjs";
-import type { ExportResult } from "./redact-safe";
+import { type ExportResult, inspectStructureInWorker } from "./redact-safe";
 import { canvasSize, createCanvas, get2d, releaseCanvas } from "./render";
 import type { Box } from "./types";
 import { type PdfRasterizer, type PngRasterizer, type VerifyReport, verifyExport } from "./verify";
@@ -39,6 +39,6 @@ export function verifyInBrowser(result: ExportResult, boxes: Box[]): Promise<Ver
   startPdfWorker();
   return verifyExport(
     { kind: result.kind, bytes: result.bytes, boxes, pageCount: result.pageCount, scales: result.scales },
-    { pdfjs, pdfjsOptions: OFFLINE_DOC_OPTIONS, rasterizePdfPage, rasterizePng },
+    { pdfjs, pdfjsOptions: OFFLINE_DOC_OPTIONS, rasterizePdfPage, rasterizePng, inspectStructure: inspectStructureInWorker },
   );
 }

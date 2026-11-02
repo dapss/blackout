@@ -17,9 +17,14 @@ export interface EncodedPage {
 
 export type WorkerRequest =
   | ({ type: "page"; bitmap: ImageBitmap } & Omit<EncodedPage, "bytes">)
-  | { type: "finish"; kind: DocKind };
+  | { type: "finish"; kind: DocKind }
+  | { type: "inspect"; id: number; bytes: Uint8Array; pages: number };
 
-export type WorkerReply = { type: "ack" } | { type: "done"; bytes: Uint8Array } | { type: "error"; message: string };
+export type WorkerReply =
+  | { type: "ack" }
+  | { type: "done"; bytes: Uint8Array }
+  | { type: "error"; message: string }
+  | { type: "inspected"; id: number; findings: Record<string, string[]> };
 
 /**
  * Build a brand-new PDF with one full-page image per page. Nothing from the original file is

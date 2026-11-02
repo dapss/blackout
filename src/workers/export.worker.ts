@@ -1,5 +1,7 @@
-// Encodes redacted page bitmaps and assembles the output file off the main thread.
+// Encodes redacted page bitmaps, assembles the output file, and re-parses it for the export check,
+// all off the main thread.
 import { buildSafePdf, type EncodedPage, encodeCanvas, type WorkerReply, type WorkerRequest } from "../core/encode";
+import { inspectPdfStructure } from "../core/verify";
 
 const scope = self as unknown as {
   onmessage: ((e: MessageEvent<WorkerRequest>) => void) | null;
@@ -10,6 +12,17 @@ let pages: EncodedPage[] = [];
 
 scope.onmessage = async (e) => {
   const msg = e.data;
+  if (msg.type === "inspect") {
+    let findings: Record<string, string[]>;
+    try {
+      findings = await inspectPdfStructure(msg.bytes, msg.pages);
+    } catch (err) {
+      // Fail closed: an inspection that couldn't run is a failed check.
+      findings = { "single-revision": [`inspection failed: ${err instanceof Error ? err.message : String(err)}`] };
+    }
+    scope.postMessage({ type: "inspected", id: msg.id, findings });
+    return;
+  }
   try {
     if (msg.type === "page") {
       const { bitmap, format, widthPt, heightPt } = msg;
