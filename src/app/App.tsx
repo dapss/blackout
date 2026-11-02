@@ -62,6 +62,17 @@ export function App() {
     };
   }, [open]);
 
+  // Boxes live only in memory: warn before a reload or closed tab throws them away.
+  useEffect(() => {
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (!dirty.current) return;
+      e.preventDefault();
+      e.returnValue = ""; // still needed by some browsers to show the prompt
+    };
+    window.addEventListener("beforeunload", onLeave);
+    return () => window.removeEventListener("beforeunload", onLeave);
+  }, []);
+
   const chooseFile = () => inputRef.current?.click();
 
   const close = useCallback(() => {

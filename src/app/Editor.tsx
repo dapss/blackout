@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { moveRect } from "../core/geometry";
+import { moveRect, resizeRect } from "../core/geometry";
 import type { LoadedDoc } from "../core/load";
 import type { Box } from "../core/types";
 import { ExportDialog } from "./ExportDialog";
-import { commit, type History, initHistory, redo, removeBox, removePageBoxes, undo, updateBox } from "./history";
+import { addBox, commit, type History, initHistory, newBoxId, redo, removeBox, removePageBoxes, undo, updateBox } from "./history";
 import { PageView, type Tool } from "./PageView";
 import { PhoneBottomBar, PhoneTopBar } from "./PhoneBars";
 import { scrollAncestorsBy } from "./scroll";
@@ -135,6 +135,45 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   }, [selectedId, history.present, change]);
   const clearPage = () => change(removePageBoxes(boxes, page));
 
+  /** Box focused after the next render (keyboard-created boxes take focus so arrow keys move them). */
+  const [focusBox, setFocusBox] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focusBox) return;
+    stageRef.current?.querySelector<HTMLElement>(`[data-box-id="${focusBox}"]`)?.focus();
+    setFocusBox(null);
+  }, [focusBox]);
+
+  /** Keyboard (and menu) way to redact: add a box in the middle of what's on screen. */
+  const addBoxInView = useCallback(() => {
+    const el = layer();
+    const stage = stageRef.current;
+    let cx = size.width / 2;
+    let cy = size.height / 2;
+    if (el && stage) {
+      const r = el.getBoundingClientRect();
+      const s = stage.getBoundingClientRect();
+      const top = Math.max(r.top, s.top, 0);
+      const bottom = Math.min(r.bottom, s.bottom, window.innerHeight);
+      if (bottom > top) {
+        cx = ((Math.max(r.left, s.left) + Math.min(r.right, s.right)) / 2 - r.left) / zoom;
+        cy = ((top + bottom) / 2 - r.top) / zoom;
+      }
+    }
+    const w = size.width * 0.3;
+    const h = Math.max(12, size.height * 0.025);
+    const box: Box = {
+      id: newBoxId(),
+      page,
+      x: Math.min(Math.max(0, cx - w / 2), size.width - w),
+      y: Math.min(Math.max(0, cy - h / 2), size.height - h),
+      w,
+      h,
+    };
+    change(addBox(boxes, box));
+    setSelectedId(box.id);
+    setFocusBox(box.id);
+  }, [size, zoom, page, boxes, change]);
+
   // Keep the selection valid after undo/redo.
   useEffect(() => {
     if (selectedId && !boxes.some((b) => b.id === selectedId)) setSelectedId(null);
@@ -163,7 +202,10 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         const step = e.shiftKey ? 10 : 1;
         const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
         const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-        change(updateBox(boxes, box.id, moveRect(box, dx, dy, doc.pages[box.page]!)));
+        const pageSize = doc.pages[box.page]!;
+        // Arrows move; Ctrl/Cmd + arrows resize from the bottom-right corner (Alt+arrow is the browser's Back).
+        const next = mod ? resizeRect(box, "se", dx, dy, pageSize) : moveRect(box, dx, dy, pageSize);
+        change(updateBox(boxes, box.id, next));
       } else if (!mod && e.key === "PageDown") {
         goTo(page + 1);
       } else if (!mod && e.key === "PageUp") {
@@ -210,6 +252,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         onWordCount={setWordCount}
         onPinchZoom={zoomTo}
         onDoubleTap={onDoubleTap}
+        onAddBox={addBoxInView}
       />
     </div>
   );
@@ -233,6 +276,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
           onZoom={(z) => (z === "in" ? stepZoom(1) : z === "out" ? stepZoom(-1) : zoomTo("fit"))}
           onPeek={setPeek}
           onClearPage={clearPage}
+          onAddBox={addBoxInView}
           onOpenFile={onOpenFile}
         />
         {stage}
@@ -275,6 +319,14 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
               Words
             </button>
           </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={addBoxInView}
+            title="Adds a box in the middle of the view. Arrow keys move it, Ctrl or Command with arrow keys resizes it."
+          >
+            Add box
+          </button>
           <button type="button" className="btn" onClick={doUndo} disabled={!history.past.length} title="Undo (Ctrl+Z)">
             Undo
           </button>

@@ -4,6 +4,7 @@ import { type ExportProgress, type ExportResult, exportSafe } from "../core/reda
 import type { Box } from "../core/types";
 import { summaryLine, type VerifyReport } from "../core/verify";
 import { verifyInBrowser } from "../core/verify-browser";
+import { useDialogFocus } from "./focus";
 
 type State =
   | { step: "rendering"; progress: ExportProgress | null }
@@ -42,12 +43,7 @@ export function ExportDialog({ doc, boxes, onClose }: { doc: LoadedDoc; boxes: B
     };
   }, [doc, boxes]);
 
-  useEffect(() => {
-    dialogRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useDialogFocus(dialogRef, onClose);
 
   const busy = state.step === "rendering" || state.step === "verifying";
   const pct =

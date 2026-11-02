@@ -1,6 +1,7 @@
 // Phone layout chrome: a slim top bar, the page in between, and a toolbar within thumb reach.
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { LoadedDoc } from "../core/load";
+import { useDialogFocus } from "./focus";
 import { Icon } from "./icons";
 import type { Tool } from "./PageView";
 import { PrivacySteps } from "./Privacy";
@@ -9,12 +10,7 @@ import { Thumbnails } from "./Thumbnails";
 /** A panel that slides up from the bottom of the screen. */
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  useDialogFocus(ref, onClose);
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div
@@ -52,6 +48,7 @@ interface TopProps {
   onZoom: (z: "in" | "out" | "fit") => void;
   onPeek: (on: boolean) => void;
   onClearPage: () => void;
+  onAddBox: () => void;
   onOpenFile: () => void;
 }
 
@@ -59,7 +56,39 @@ export function PhoneTopBar(p: TopProps) {
   const [menu, setMenu] = useState(false);
   const [privacy, setPrivacy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
   const total = p.doc.pages.length;
+
+  const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role^=menuitem]:not(:disabled)") ?? [])];
+
+  // Opening the menu moves focus to its first item, as a menu button should.
+  useEffect(() => {
+    if (menu) menuItems()[0]?.focus();
+  }, [menu]);
+
+  const closeMenu = (refocus: boolean) => {
+    setMenu(false);
+    if (refocus) moreRef.current?.focus();
+  };
+
+  /** Arrow keys move between items, Home/End jump, Escape closes, Tab leaves the menu. */
+  const onMenuKey = (e: React.KeyboardEvent) => {
+    const items = menuItems();
+    const i = items.indexOf(document.activeElement as HTMLButtonElement);
+    const go = (n: number) => {
+      e.preventDefault();
+      items[(n + items.length) % items.length]?.focus();
+    };
+    if (e.key === "ArrowDown") go(i + 1);
+    else if (e.key === "ArrowUp") go(i - 1);
+    else if (e.key === "Home") go(0);
+    else if (e.key === "End") go(items.length - 1);
+    else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeMenu(true);
+    } else if (e.key === "Tab") closeMenu(false);
+  };
 
   // Close the menu on any tap outside it.
   useEffect(() => {
@@ -77,8 +106,9 @@ export function PhoneTopBar(p: TopProps) {
       role={opts.checked === undefined ? "menuitem" : "menuitemcheckbox"}
       aria-checked={opts.checked}
       disabled={opts.disabled}
+      tabIndex={-1}
       onClick={() => {
-        setMenu(false);
+        closeMenu(true);
         action();
       }}
     >
@@ -99,6 +129,7 @@ export function PhoneTopBar(p: TopProps) {
         <div className="p-menu-wrap" ref={menuRef}>
           <button
             type="button"
+            ref={moreRef}
             className="p-icon"
             aria-label="More"
             aria-haspopup="menu"
@@ -108,7 +139,8 @@ export function PhoneTopBar(p: TopProps) {
             <Icon name="more" />
           </button>
           {menu && (
-            <div className="p-menu" role="menu" aria-label="More">
+            <div className="p-menu" role="menu" aria-label="More" onKeyDown={onMenuKey}>
+              {item("Add box", p.onAddBox)}
               {item("Zoom in", () => p.onZoom("in"))}
               {item("Zoom out", () => p.onZoom("out"))}
               {item(p.zoomMode === "fit" ? "Fit to width" : `Fit to width (now ${Math.round(p.zoom * 100)}%)`, () =>

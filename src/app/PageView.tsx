@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { isUsableRect, moveRect, rectFromPoints, resizeRect } from "../core/geometry";
 import type { LoadedDoc } from "../core/load";
 import { canvasSize, createCanvas, get2d, releaseCanvas } from "../core/render";
 import type { Box, Rect, ResizeHandle } from "../core/types";
-import { type Word, wordAt, wordBox, lineRects, wordsInRect } from "../core/words";
+import { groupLines, type Word, wordAt, wordBox, lineRects, wordsInRect } from "../core/words";
 import { addBox, newBoxId, updateBox } from "./history";
 import { scrollAncestorsBy } from "./scroll";
 
@@ -38,6 +38,8 @@ interface Props {
   /** Pinch: zoom to `zoom`, keeping the page point under (cx, cy) in place. */
   onPinchZoom?: (zoom: number, cx: number, cy: number) => void;
   onDoubleTap?: (cx: number, cy: number) => void;
+  /** Keyboard: Enter on the page in Draw mode adds a box in the middle of the view. */
+  onAddBox?: () => void;
 }
 
 export function PageView({
@@ -53,6 +55,7 @@ export function PageView({
   onWordCount,
   onPinchZoom,
   onDoubleTap,
+  onAddBox,
 }: Props) {
   const size = doc.pages[pageIndex]!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -259,9 +262,9 @@ export function PageView({
   };
 
   /** Click a word: black it out, or select the box that already covers it. */
-  const redactWordAt = (x: number, y: number) => {
+  const redactWordAt = (x: number, y: number): "added" | "covered" | null => {
     const word = words && wordAt(words, x, y);
-    if (!word) return;
+    if (!word) return null;
     const cx = word.x + word.w / 2;
     const cy = word.y + word.h / 2;
     const covering = boxes.find(
@@ -269,10 +272,71 @@ export function PageView({
     );
     if (covering) {
       onSelect(covering.id);
-      return;
+      return "covered";
     }
     // Not selected afterwards: its handles would cover neighbouring words and catch the next tap.
     onChange(addBox(boxes, { id: newBoxId(), page: pageIndex, ...wordBox(word, size) }));
+    return "added";
+  };
+
+  // --- Keyboard: the page is one Tab stop; in Words mode arrow keys walk the words. ---
+
+  /** Words in reading order, grouped by line. */
+  const lines = useMemo(() => {
+    if (!words) return [];
+    return groupLines(words)
+      .map((line) => [...line].sort((a, b) => a.x - b.x))
+      .sort((a, b) => Math.min(...a.map((w) => w.y)) - Math.min(...b.map((w) => w.y)));
+  }, [words]);
+  const ordered = useMemo(() => lines.flat(), [lines]);
+  const [cursor, setCursor] = useState<Word | null>(null);
+  const [announce, setAnnounce] = useState("");
+  useEffect(() => setCursor(null), [words]);
+
+  const moveCursor = (next: Word | undefined) => {
+    if (!next) return;
+    setCursor(next);
+    setAnnounce(`${next.text}, word ${ordered.indexOf(next) + 1} of ${ordered.length}`);
+    const el = layerRef.current?.querySelector<HTMLElement>(`[data-word-index="${words?.indexOf(next)}"]`);
+    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+
+  const onLayerKey = (e: React.KeyboardEvent) => {
+    if (e.target !== layerRef.current || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (tool === "draw") {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onAddBox?.();
+      }
+      return;
+    }
+    if (!ordered.length) return;
+    const current = cursor && ordered.includes(cursor) ? cursor : null;
+    const i = current ? ordered.indexOf(current) : -1;
+    const lineIndex = current ? lines.findIndex((l) => l.includes(current)) : -1;
+    /** The word on another line closest (horizontally) to the current one. */
+    const onLine = (li: number) => {
+      const line = lines[li];
+      if (!line) return undefined;
+      const cx = current ? current.x + current.w / 2 : 0;
+      return [...line].sort((a, b) => Math.abs(a.x + a.w / 2 - cx) - Math.abs(b.x + b.w / 2 - cx))[0];
+    };
+    let handled = true;
+    if (e.key === "ArrowRight") moveCursor(ordered[Math.min(i + 1, ordered.length - 1)]);
+    else if (e.key === "ArrowLeft") moveCursor(ordered[Math.max(i - 1, 0)]);
+    else if (e.key === "ArrowDown") moveCursor(onLine(Math.min(lineIndex + 1, lines.length - 1)));
+    else if (e.key === "ArrowUp") moveCursor(onLine(Math.max(lineIndex - 1, 0)));
+    else if (e.key === "Home") moveCursor(ordered[0]);
+    else if (e.key === "End") moveCursor(ordered[ordered.length - 1]);
+    else if ((e.key === "Enter" || e.key === " ") && current) {
+      const result = redactWordAt(current.x + current.w / 2, current.y + current.h / 2);
+      setAnnounce(result === "added" ? `${current.text} blacked out` : `${current.text} is already covered`);
+    } else handled = false;
+    if (handled) {
+      e.preventDefault();
+      // Keep the arrow keys from also moving a selected box (Editor listens on window).
+      e.stopPropagation();
+    }
   };
 
   // Delayed taps call the latest version, so they see the boxes as they are when they fire.
@@ -344,11 +408,12 @@ export function PageView({
         ref={layerRef}
         className={`layer tool-${tool}${peek ? " peek" : ""}`}
         data-testid="page-layer"
-        aria-label={
-          tool === "words"
-            ? `Page ${pageIndex + 1}. Click a word or drag across words to black them out.`
-            : `Page ${pageIndex + 1}. Drag to draw a redaction box.`
-        }
+        role="application"
+        tabIndex={0}
+        aria-label={`Page ${pageIndex + 1}`}
+        aria-describedby="page-keys"
+        onKeyDown={onLayerKey}
+        onBlur={() => setAnnounce("")}
         onPointerDownCapture={onTouchDownCapture}
         onPointerDown={onLayerDown}
         onPointerMove={onMove}
@@ -360,9 +425,10 @@ export function PageView({
           words?.map((w, i) => (
             <span
               key={i}
-              className={`word${w === hover ? " hover" : ""}${pending.has(w) ? " pending" : ""}`}
+              className={`word${w === hover ? " hover" : ""}${pending.has(w) ? " pending" : ""}${w === cursor ? " cursor" : ""}`}
               data-testid="word"
               data-word={w.text}
+              data-word-index={i}
               style={px(w)}
             />
           ))}
@@ -371,10 +437,12 @@ export function PageView({
             key={b.id}
             className={`box${b.id === selectedId ? " selected" : ""}`}
             data-testid="box"
+            data-box-id={b.id}
             style={px(b)}
             role="button"
             tabIndex={0}
             aria-label={`Redaction box ${i + 1}`}
+            aria-describedby="box-keys"
             aria-pressed={b.id === selectedId}
             onFocus={() => onSelect(b.id)}
             onPointerDown={(e) => onBoxDown(e, b)}
@@ -394,6 +462,17 @@ export function PageView({
           <div className={sweeping ? "sweep" : "box draft"} style={px(draft.rect)} />
         )}
       </div>
+      <p id="page-keys" className="sr-only">
+        {tool === "words"
+          ? "Click or tap a word, or drag across words, to black them out. With the keyboard: arrow keys move between words, Enter blacks out the current word."
+          : "Drag to draw a redaction box. With the keyboard: press Enter to add a box in the middle of the view."}
+      </p>
+      <p id="box-keys" className="sr-only">
+        Arrow keys move the box, Shift for bigger steps. Control or Command with arrow keys resizes it. Delete removes it.
+      </p>
+      <p className="sr-only" aria-live="polite" data-testid="page-announce">
+        {announce}
+      </p>
     </div>
   );
 }
