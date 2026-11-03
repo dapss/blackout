@@ -6,6 +6,11 @@ shows which version you are using.
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor versions (0.2, 0.3)
 bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and polish.
 
+## Unreleased
+
+### Maintenance
+- New changes go to a preview site first; the live site only updates when a version is released.
+
 ## 0.1.2 (2026-11-03)
 
 ### Changed
