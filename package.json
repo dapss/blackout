@@ -1,6 +1,6 @@
 {
   "name": "blackout",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Redact PDFs and images entirely in your browser. Nothing is uploaded.",
   "license": "Apache-2.0",

@@ -40,7 +40,7 @@ The end-to-end tests check points 1 to 3 automatically. See [SECURITY.md](SECURI
 
 The checks above cover what the page does. This one covers *which code* you got: that the files [blackout-redact.pages.dev](https://blackout-redact.pages.dev) serves were built from this repository, and not changed along the way.
 
-- **See the version.** The footer shows the version and commit, for example `v0.1.0 · 8eb4e01`, and links to that commit's source.
+- **See the version.** The footer shows the version and commit, for example `v0.1.1 · af8c9f7`, and links to that commit's source. [CHANGELOG.md](CHANGELOG.md) lists what changed in each version.
 - **Check the signatures.** Every deploy is built by [this repo's GitHub Actions workflow](.github/workflows/deploy.yml), which signs each file with GitHub's build provenance (Sigstore) before uploading it. With the [GitHub CLI](https://cli.github.com) installed:
 
   ```bash
