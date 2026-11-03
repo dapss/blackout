@@ -39,9 +39,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4 # version comes from "packageManager" in package.json
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version comes from "packageManager" in package.json
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -52,7 +52,7 @@ jobs:
       - run: pnpm test:e2e ${{ matrix.projects }}
         env:
           CI: "true"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-traces-${{ matrix.os }}
@@ -71,9 +71,9 @@ jobs:
       id-token: write # sign with GitHub's Sigstore identity
       attestations: write # publish the signatures on the repo
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -82,7 +82,7 @@ jobs:
       # Sign every file that is about to be served, so anyone can check that what the site gives
       # them was built from this repo by this workflow: gh attestation verify <file> --repo dapss/blackout
       - name: Sign build provenance
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: dist/**
       - name: Deploy to Cloudflare Pages

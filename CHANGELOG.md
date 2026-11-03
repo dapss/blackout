@@ -4,6 +4,15 @@ Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor ve
 add the larger features on the roadmap and patch versions (0.1.1, 0.1.2) are fixes and polish.
 The footer of the app shows the version and the exact commit it was built from.
 
+## 0.1.2 (2026-11-03)
+
+### Changed
+- Returning visitors load the app from their browser cache instead of checking every script with
+  the server again. Script and style files are cached for a year; their names change whenever
+  their content does, so a new release is still picked up straight away.
+- The README explains plainly why the exported PDF is images only.
+- CI uses the current versions of its GitHub Actions (Node 24), ahead of the Node 20 shutdown.
+
 ## 0.1.1 (2026-11-03)
 
 ### Added

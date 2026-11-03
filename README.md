@@ -23,7 +23,7 @@ Made by [Mochamad Daffa](https://github.com/dapss). Licensed under [Apache-2.0](
   - one revision only (no incremental updates hiding older content)
   - for images: no EXIF or text chunks in the PNG
 
-Trade-off: safe-mode PDFs are larger than the original and their text can't be selected or searched.
+**Trade-off: the exported PDF is pictures of the pages.** Its text can't be selected, searched or copied, and the file is usually larger than the original. This is on purpose: text that isn't in the file can't leak, whether through a box drawn slightly off, hidden text under the visible page, or a copy-paste. Keep your original if you need the searchable version.
 
 ## How to verify nothing is uploaded
 

@@ -40,6 +40,10 @@ function csp(): Plugin {
         "/*",
         `  Content-Security-Policy: ${buildCsp({ header: true })}`,
         ...Object.entries(SECURITY_HEADERS).map(([k, v]) => `  ${k}: ${v}`),
+        // Asset names carry a content hash, so a changed file gets a new name: safe to keep for a
+        // year. index.html keeps the host's default and is checked on every visit.
+        "/assets/*",
+        "  Cache-Control: public, max-age=31536000, immutable",
         "",
       ];
       this.emitFile({ type: "asset", fileName: "_headers", source: lines.join("\n") });
