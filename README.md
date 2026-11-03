@@ -23,7 +23,7 @@ Made by [Mochamad Daffa](https://github.com/dapss). Licensed under [Apache-2.0](
   - one revision only (no incremental updates hiding older content)
   - for images: no EXIF or text chunks in the PNG
 
-**Trade-off: the exported PDF is pictures of the pages.** Its text can't be selected, searched or copied, and the file is usually larger than the original. This is on purpose: text that isn't in the file can't leak, whether through a box drawn slightly off, hidden text under the visible page, or a copy-paste. Keep your original if you need the searchable version.
+**Trade-off: the exported PDF is pictures of the pages.** Its text can't be selected, searched or copied, and the file is usually larger than the original. This is on purpose: text that isn't in the file can't leak, whether through a box drawn slightly off, hidden text under the visible page, or a copy-paste. Keep your original if you need the searchable version. A second export mode is planned that keeps the rest of the text searchable and removes only what is under your boxes. It will sit alongside this one, and safe mode will stay the default.
 
 ## How to verify nothing is uploaded
 
