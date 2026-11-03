@@ -30,6 +30,8 @@ test("shows the privacy banner and the author credit", async ({ page }) => {
   await expect(version).toHaveText(/^v\d+\.\d+\.\d+ · [0-9a-f]{7} \(verify\)$/);
   await expect(version.getByRole("link").first()).toHaveAttribute("href", /github\.com\/dapss\/blackout\/commit\/[0-9a-f]{40}$/);
   await expect(version.getByRole("link", { name: "verify" })).toHaveAttribute("href", /#verify-this-copy$/);
+  // Test builds aren't releases, so they are labelled as previews pointing at the released site.
+  await expect(footer.getByTestId("preview-label")).toHaveAttribute("href", "https://blackout-redact.pages.dev");
 });
 
 test("text PDF: the export has zero extractable text and nothing else from the original", async ({ page }) => {

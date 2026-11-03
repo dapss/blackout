@@ -3,7 +3,18 @@ import { ACCEPT, type LoadedDoc, LoadError, loadDocument } from "../core/load";
 import { Editor } from "./Editor";
 import { PrivacyBanner } from "./Privacy";
 import { PHONE_QUERY, useMediaQuery } from "./scroll";
-import { APP_COMMIT, APP_VERSION, AUTHOR_NAME, AUTHOR_URL, COMMIT_URL, LICENSE_URL, REPO_URL, VERIFY_URL } from "./site";
+import {
+  APP_COMMIT,
+  APP_RELEASED,
+  APP_VERSION,
+  AUTHOR_NAME,
+  AUTHOR_URL,
+  COMMIT_URL,
+  LICENSE_URL,
+  LIVE_URL,
+  REPO_URL,
+  VERIFY_URL,
+} from "./site";
 
 export function App() {
   const [doc, setDoc] = useState<LoadedDoc | null>(null);
@@ -174,6 +185,16 @@ export function App() {
           </a>
           )
         </span>
+        {!APP_RELEASED && (
+          <a
+            className="preview-tag"
+            data-testid="preview-label"
+            href={LIVE_URL}
+            title={`Unreleased changes newer than v${APP_VERSION}. Open the released version.`}
+          >
+            Preview build
+          </a>
+        )}
       </footer>
       )}
     </div>

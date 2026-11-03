@@ -663,6 +663,15 @@ a {
   color: var(--ink);
 }
 
+/* Builds of main that aren't a release yet. */
+.footer .preview-tag {
+  padding: 0 8px;
+  border: 1px solid var(--ink-2);
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
 /* --- Phone width --- */
 
 @media (max-width: 720px) {

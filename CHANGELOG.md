@@ -8,6 +8,10 @@ bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and 
 
 ## Unreleased
 
+### Added
+- Preview builds say so: the footer shows a "Preview build" label that links to the released
+  version, so nobody mistakes unreleased changes for a release.
+
 ### Maintenance
 - New changes go to a preview site first; the live site only updates when a version is released.
 

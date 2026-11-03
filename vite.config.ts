@@ -68,6 +68,8 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(buildCommit()),
+    // Only the release job in CI sets RELEASE=true; every other build (main, local) is a preview.
+    __APP_RELEASE__: JSON.stringify(process.env.RELEASE === "true"),
   },
   base: "./",
   plugins: [react(), csp()],
