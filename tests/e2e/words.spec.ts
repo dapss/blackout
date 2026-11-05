@@ -123,6 +123,21 @@ test.describe("on a plain PDF", () => {
     expect((await pdfTextItems(bytes)).items).toBe(0);
   });
 
+  test("a flat drag along a line of text blacks out the words it crosses", async ({ page }) => {
+    const line = await secretSpan("", SECRET);
+    const a = await toScreen(page, line.x0 + 2, BASELINE - 6);
+    const b = await toScreen(page, line.x1 - 2, BASELINE - 6);
+    await page.mouse.move(a.x, a.y);
+    await page.mouse.down();
+    await page.mouse.move(b.x, a.y, { steps: 6 }); // exactly level, no height at all
+    await expect(page.locator(".word.pending")).toHaveCount(2);
+    await page.mouse.up();
+
+    await expect(page.getByTestId("box")).toHaveCount(1);
+    const [ink] = (await readInk(page, PAGE_W, [{ baseline: BASELINE, size: 18, words: [{ text: SECRET, ...line }] }]))[0]!;
+    expectExact(await boxInPage(page), ink!);
+  });
+
   test("dragging across words makes one box per line, including the gap", async ({ page }) => {
     const line = await secretSpan("", SECRET);
     const a = await toScreen(page, line.x0 + 2, BASELINE - 10);

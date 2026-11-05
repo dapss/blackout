@@ -316,13 +316,21 @@ export function wordAt(words: Word[], x: number, y: number): Word | undefined {
   return words.find((w) => x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h);
 }
 
-/** Words a drag rectangle takes: at least a third of the word's area must be inside it. */
+/** How much of the shorter of two spans lies in their overlap, from 0 to 1. A zero-length span inside the other counts in full. */
+function spanShare(a: number, aLen: number, b: number, bLen: number): number {
+  const overlap = Math.min(a + aLen, b + bLen) - Math.max(a, b);
+  if (overlap < 0) return 0;
+  const shorter = Math.min(aLen, bLen);
+  return shorter > 0 ? overlap / shorter : 1;
+}
+
+/**
+ * Words a drag takes: at least a third of the word must be crossed. Measuring against the shorter
+ * span means a flat drag along a line of text counts, like running a marker over it, even though
+ * its rectangle has almost no height.
+ */
 export function wordsInRect(words: Word[], r: Rect): Word[] {
-  return words.filter((w) => {
-    const ix = Math.min(w.x + w.w, r.x + r.w) - Math.max(w.x, r.x);
-    const iy = Math.min(w.y + w.h, r.y + r.h) - Math.max(w.y, r.y);
-    return ix > 0 && iy > 0 && ix * iy >= (w.w * w.h) / 3;
-  });
+  return words.filter((w) => spanShare(w.x, w.w, r.x, r.w) * spanShare(w.y, w.h, r.y, r.h) >= 1 / 3);
 }
 
 /**

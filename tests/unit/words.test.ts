@@ -228,6 +228,17 @@ describe("selection helpers", () => {
     expect(wordsInRect(words, { x: 0, y: 0, w: 45, h: 30 }).map((x) => x.text)).toEqual(["a"]);
   });
 
+  it("wordsInRect takes the words a flat line runs through", () => {
+    const y = words[0]!.y + words[0]!.h / 2;
+    // Perfectly level, and with a little height from an unsteady hand.
+    expect(wordsInRect(words, { x: 0, y, w: 100, h: 0 }).map((x) => x.text)).toEqual(["a", "b", "c"]);
+    expect(wordsInRect(words, { x: 0, y, w: 100, h: 1 }).map((x) => x.text)).toEqual(["a", "b", "c"]);
+    // Stopping at the start of a word doesn't take it.
+    expect(wordsInRect(words, { x: 0, y, w: 41, h: 0 }).map((x) => x.text)).toEqual(["a"]);
+    // In the gap between lines, it takes nothing.
+    expect(wordsInRect(words, { x: 0, y: 30, w: 100, h: 0 })).toEqual([]);
+  });
+
   it("lineRects merges each line into one rectangle, covering the gaps", () => {
     expect(lineRects(words).map(({ x, y, w: width, h }) => ({ x, y, w: width, h }))).toEqual([
       { x: 10, y: 10, w: 80, h: 11 },

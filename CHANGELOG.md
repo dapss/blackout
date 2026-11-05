@@ -13,6 +13,8 @@ bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and 
   exactly where a box starts and ends.
 - An action bubble next to the selected box on phones, with Delete, and in Words mode "Fit to words",
   which shrinks a rough box onto the words under it.
+- In Words mode, a straight drag along a line of text blacks out the words it crosses, like running
+  a marker over them.
 - Words mode says "Finding the words on this page…" until it's ready.
 - Preview builds say so: the footer shows a "Preview build" label that links to the released
   version, so nobody mistakes unreleased changes for a release.
