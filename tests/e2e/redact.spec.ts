@@ -162,7 +162,7 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
 
   // Delete button, then boxes on other pages are kept separately.
   await boxes.first().click();
-  await page.getByRole("button", { name: "Delete" }).click();
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(boxes).toHaveCount(0);
   await page.getByRole("button", { name: "Next page" }).click();
   await expect(page.getByTestId("page-indicator")).toHaveText("2 / 2");
@@ -209,4 +209,16 @@ test("rejects files that are not PDFs or images", async ({ page }) => {
     buffer: Buffer.from("<html>not a pdf</html>"),
   });
   await expect(page.getByRole("alert")).toContainText("Unsupported file");
+});
+
+test.describe("on a desktop screen", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("a selected box has no action bubble", async ({ page }) => {
+    await page.goto("/");
+    await openFixture(page, "dirty.pdf");
+    await drawBox(page, 0.3, 0.4, 0.7, 0.45);
+    await expect(page.getByTestId("box")).toHaveCount(1);
+    await expect(page.getByTestId("box-bubble")).toHaveCount(0);
+  });
 });

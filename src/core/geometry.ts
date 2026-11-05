@@ -70,3 +70,37 @@ export function innerPixelRect(r: Rect, scale: number, inset: number, maxW: numb
   y1 = clamp(Math.max(y1, y0 + 1), 1, maxH);
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
+
+/** Size of the touch magnifier, in screen pixels. */
+export const LOUPE_SIZE = 120;
+
+/**
+ * Where the touch magnifier goes: above and to the side of the finger, so the finger never covers
+ * it. It prefers the left (a right thumb reaches in from the lower right), and slides down beside
+ * the finger when there's no room above.
+ */
+export function loupeSpot(fingerX: number, fingerY: number, viewW: number, viewH: number): { left: number; top: number } {
+  const margin = 8;
+  const side = 28;
+  const left = fingerX - LOUPE_SIZE - side;
+  return {
+    left: left >= margin ? left : Math.min(fingerX + side, viewW - LOUPE_SIZE - margin),
+    top: clamp(fingerY - LOUPE_SIZE - side, margin, Math.max(margin, viewH - LOUPE_SIZE - margin)),
+  };
+}
+
+/** Clear of a selected box's touch handles, whose grab areas reach 22px outside it. */
+const BUBBLE_GAP = 26;
+const BUBBLE_HEIGHT = 50;
+
+/**
+ * Where the action bubble goes on the page, in screen pixels: above the box, below it if there's no
+ * room, and just inside its top edge if it fills the page. Lined up with the box's side nearer the
+ * page edge, so it stays on the page.
+ */
+export function bubbleSpot(box: Rect, pageW: number, pageH: number): { top: number; left?: number; right?: number } {
+  const above = box.y - BUBBLE_GAP - BUBBLE_HEIGHT;
+  const below = box.y + box.h + BUBBLE_GAP;
+  const top = above >= 0 ? above : below + BUBBLE_HEIGHT <= pageH ? below : box.y + 4;
+  return box.x + box.w / 2 < pageW / 2 ? { top, left: box.x } : { top, right: pageW - box.x - box.w };
+}

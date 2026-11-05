@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { innerPixelRect, isUsableRect, MIN_BOX_SIZE, moveRect, rectFromPoints, resizeRect, toPixelRect } from "../../src/core/geometry";
+import { bubbleSpot, innerPixelRect, isUsableRect, LOUPE_SIZE, loupeSpot, MIN_BOX_SIZE, moveRect, rectFromPoints, resizeRect, toPixelRect } from "../../src/core/geometry";
 
 const page = { width: 100, height: 200 };
 
@@ -67,4 +67,46 @@ describe("innerPixelRect", () => {
 it("isUsableRect", () => {
   expect(isUsableRect({ x: 0, y: 0, w: 1, h: 10 })).toBe(false);
   expect(isUsableRect({ x: 0, y: 0, w: 2, h: 2 })).toBe(true);
+});
+
+describe("loupeSpot", () => {
+  const covers = (s: { left: number; top: number }, x: number, y: number) =>
+    x >= s.left && x <= s.left + LOUPE_SIZE && y >= s.top && y <= s.top + LOUPE_SIZE;
+
+  it("goes above and to the left of the finger", () => {
+    const s = loupeSpot(300, 400, 390, 844);
+    expect(s.left + LOUPE_SIZE).toBeLessThan(300);
+    expect(s.top + LOUPE_SIZE).toBeLessThan(400);
+  });
+  it("switches to the right near the left edge", () => {
+    expect(loupeSpot(40, 400, 390, 844).left).toBeGreaterThan(40);
+  });
+  it("is never under the finger or off screen, wherever the finger is", () => {
+    for (const x of [0, 40, 148, 200, 320]) {
+      for (const y of [0, 20, 130, 500, 700]) {
+        const s = loupeSpot(x, y, 320, 700);
+        expect(covers(s, x, y)).toBe(false);
+        expect(s.left).toBeGreaterThanOrEqual(0);
+        expect(s.top).toBeGreaterThanOrEqual(0);
+        expect(s.left + LOUPE_SIZE).toBeLessThanOrEqual(320);
+        expect(s.top + LOUPE_SIZE).toBeLessThanOrEqual(700);
+      }
+    }
+  });
+});
+
+describe("bubbleSpot", () => {
+  it("sits above the box, clear of its handles", () => {
+    expect(bubbleSpot({ x: 10, y: 200, w: 50, h: 20 }, 300, 400).top).toBe(124);
+  });
+  it("goes below when there is no room above", () => {
+    expect(bubbleSpot({ x: 10, y: 10, w: 50, h: 20 }, 300, 400).top).toBe(56);
+  });
+  it("stays inside a box that fills the page", () => {
+    expect(bubbleSpot({ x: 0, y: 0, w: 300, h: 400 }, 300, 400).top).toBe(4);
+  });
+  it("lines up with the side nearer the page edge", () => {
+    expect(bubbleSpot({ x: 10, y: 200, w: 50, h: 20 }, 300, 400).left).toBe(10);
+    expect(bubbleSpot({ x: 240, y: 200, w: 50, h: 20 }, 300, 400).right).toBe(10);
+  });
 });

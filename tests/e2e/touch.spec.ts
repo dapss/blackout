@@ -167,3 +167,61 @@ test("in Words, taps still redact, including quick taps on different words", asy
   await tap("Quarterly");
   await expect(page.getByTestId("box")).toHaveCount(3);
 });
+
+test("the magnifier follows a dragging finger, without covering it; a tap doesn't show it", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const loupe = page.getByTestId("loupe");
+  const r = await layerBox(page);
+  const a = { x: r.x + 200, y: r.y + 200 };
+  const b = { x: r.x + 280, y: r.y + 260 };
+
+  await touch(cdp, "touchStart", [a]);
+  await touch(cdp, "touchEnd", []);
+  await expect(loupe).toHaveCount(0);
+
+  await touch(cdp, "touchStart", [a]);
+  await swipe(cdp, [a], [b]);
+  await expect(loupe).toBeVisible();
+  const spot = (await loupe.boundingBox())!;
+  const under = b.x >= spot.x && b.x <= spot.x + spot.width && b.y >= spot.y && b.y <= spot.y + spot.height;
+  expect(under).toBe(false);
+  await touch(cdp, "touchEnd", []);
+  await expect(loupe).toHaveCount(0);
+  await expect(page.getByTestId("box")).toHaveCount(1);
+});
+
+test("the magnifier shows a box under the finger", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const r = await layerBox(page);
+  const a = { x: r.x + 60, y: r.y + 200 };
+  const b = { x: r.x + 240, y: r.y + 260 };
+  await touch(cdp, "touchStart", [a]);
+  await swipe(cdp, [a], [b]);
+  await touch(cdp, "touchEnd", []);
+
+  // Drag the box by its middle: everything around the magnifier's crosshair should be the black box.
+  const box = (await page.getByTestId("box").boundingBox())!;
+  const mid = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await touch(cdp, "touchStart", [mid]);
+  await swipe(cdp, [mid], [{ x: mid.x + 20, y: mid.y }]);
+  const pixel = await page.getByTestId("loupe").evaluate((el) => {
+    const c = el as HTMLCanvasElement;
+    return [...c.getContext("2d")!.getImageData(c.width / 2 + 20, c.height / 2 + 20, 1, 1).data];
+  });
+  await touch(cdp, "touchEnd", []);
+  expect(pixel.slice(0, 3)).toEqual([0, 0, 0]);
+});
+
+test("a second finger puts the magnifier away", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const r = await layerBox(page);
+  const a = { x: r.x + 100, y: r.y + 200 };
+  const b = { x: r.x + 160, y: r.y + 240 };
+  await touch(cdp, "touchStart", [a]);
+  await swipe(cdp, [a], [b]);
+  await expect(page.getByTestId("loupe")).toBeVisible();
+  await touch(cdp, "touchStart", [b, { x: b.x + 60, y: b.y }]);
+  await expect(page.getByTestId("loupe")).toHaveCount(0);
+  await touch(cdp, "touchEnd", []);
+  await expect(page.getByTestId("box")).toHaveCount(0);
+});

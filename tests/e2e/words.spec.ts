@@ -209,3 +209,56 @@ test.describe("precision on hard text", () => {
     expect((await pdfTextItems(bytes)).items).toBe(0);
   });
 });
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("Fit to words shrinks a rough box onto the words, and undoes in one step", async ({ page }) => {
+    await page.goto("/");
+    await openFixture(page, "dirty.pdf");
+    await useWords(page, "123-45-6789");
+    const word = (await page.locator('[data-testid="word"][data-word="123-45-6789"]').boundingBox())!;
+
+    // Draw a rough box around the word with plenty of room to spare.
+    await page.getByRole("radio", { name: "Draw" }).click();
+    await page.mouse.move(word.x - 6, word.y - 12);
+    await page.mouse.down();
+    await page.mouse.move(word.x + word.width + 6, word.y + word.height + 12, { steps: 4 });
+    await page.mouse.up();
+    const box = page.getByTestId("box");
+    const rough = (await box.boundingBox())!;
+
+    const fit = page.getByRole("button", { name: "Fit to words" });
+    await expect(fit).toHaveCount(0); // Draw mode doesn't load the words
+    await page.getByRole("radio", { name: "Words" }).click();
+    await fit.click();
+
+    await expect(box).toHaveCount(1);
+    const tight = (await box.boundingBox())!;
+    expect(tight.height).toBeLessThan(rough.height);
+    // Still covers the whole word.
+    expect(tight.x).toBeLessThanOrEqual(word.x + 1);
+    expect(tight.y).toBeLessThanOrEqual(word.y + 1);
+    expect(tight.x + tight.width).toBeGreaterThanOrEqual(word.x + word.width - 1);
+    expect(tight.y + tight.height).toBeGreaterThanOrEqual(word.y + word.height - 1);
+    await expect(fit).toHaveCount(0); // it fits now
+
+    await page.getByRole("button", { name: "Undo" }).click();
+    expect((await box.boundingBox())!.height).toBeCloseTo(rough.height, 0);
+  });
+});
+
+test("the hint says when it is still finding the words", async ({ page }) => {
+  await page.goto("/");
+  await openFixture(page, "dirty.pdf");
+  await page.evaluate(() => {
+    const seen: string[] = [];
+    (window as unknown as { seen: string[] }).seen = seen;
+    const hint = document.querySelector('[data-testid="stage-hint"]')!;
+    new MutationObserver(() => seen.push(hint.textContent ?? "")).observe(hint, { childList: true, characterData: true, subtree: true });
+  });
+  await useWords(page, "123-45-6789");
+  const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen);
+  expect(seen.some((t) => t.includes("Finding the words"))).toBe(true);
+  await expect(page.getByTestId("stage-hint")).not.toContainText("Finding the words");
+});

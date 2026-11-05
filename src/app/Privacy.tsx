@@ -7,11 +7,11 @@ export function PrivacySteps() {
         never needs the network.
       </li>
       <li>
-        Or open your browser's developer tools (F12), go to the <em>Network</em> tab, then open and export a file. No
+        Or open your browser’s developer tools (F12), go to the <em>Network</em> tab, then open and export a file. No
         request is made.
       </li>
       <li>
-        The page's Content Security Policy sets <code>connect-src 'self'</code>, so the browser itself refuses to send
+        The page’s Content Security Policy sets <code>connect-src 'self'</code>, so the browser itself refuses to send
         data to any other server.
       </li>
       <li>The code is open source. You can read it, build it yourself and compare.</li>

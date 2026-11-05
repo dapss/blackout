@@ -9,8 +9,19 @@ bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and 
 ## Unreleased
 
 ### Added
+- A magnifier on touch screens: while you drag, it shows what's under your finger, so you can see
+  exactly where a box starts and ends.
+- An action bubble next to the selected box on phones, with Delete, and in Words mode "Fit to words",
+  which shrinks a rough box onto the words under it.
+- Words mode says "Finding the words on this page…" until it's ready.
 - Preview builds say so: the footer shows a "Preview build" label that links to the released
   version, so nobody mistakes unreleased changes for a release.
+
+### Changed
+- Your phone's browser bar matches the app's colours.
+- Buttons respond to a press without the grey flash on iPhone.
+- Animations turn off if you've asked your device to reduce motion.
+- Typographic apostrophes throughout the app's text.
 
 ### Maintenance
 - New changes go to a preview site first; the live site only updates when a version is released.

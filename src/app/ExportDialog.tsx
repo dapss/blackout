@@ -62,7 +62,7 @@ export function ExportDialog({ doc, boxes, onClose }: { doc: LoadedDoc; boxes: B
       >
         <h2 id="export-title">Export in safe mode</h2>
         <p className="muted">
-          Each page is turned into an image, the boxes are burned in, and a brand-new file is built. The original's
+          Each page is turned into an image, the boxes are burned in, and a brand-new file is built. The original’s
           text, metadata, links, forms and attachments are left behind.
         </p>
 
@@ -94,7 +94,7 @@ export function ExportDialog({ doc, boxes, onClose }: { doc: LoadedDoc; boxes: B
             </p>
             {boxes.length === 0 && (
               <p className="muted">
-                You haven't drawn any boxes, so nothing is blacked out. The file is still flattened and cleaned.
+                You haven’t drawn any boxes, so nothing is blacked out. The file is still flattened and cleaned.
               </p>
             )}
             <ul className="checks" data-testid="verify-checks">

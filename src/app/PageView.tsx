@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { isUsableRect, moveRect, rectFromPoints, resizeRect } from "../core/geometry";
+import { bubbleSpot, isUsableRect, moveRect, rectFromPoints, resizeRect } from "../core/geometry";
 import type { LoadedDoc } from "../core/load";
 import { canvasSize, createCanvas, get2d, releaseCanvas } from "../core/render";
 import type { Box, Rect, ResizeHandle } from "../core/types";
 import { groupLines, type Word, wordAt, wordBox, lineRects, wordsInRect } from "../core/words";
 import { addBox, newBoxId, updateBox } from "./history";
+import { Loupe } from "./Loupe";
 import { scrollAncestorsBy } from "./scroll";
 
 export type Tool = "draw" | "words";
@@ -16,6 +17,10 @@ const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_PX = 30;
 /** While zoom is changing (pinch), re-render the page this long after it settles; it stretches meanwhile. */
 const RENDER_SETTLE_MS = 150;
+/** A finger must drag this far (screen px) before the magnifier appears, so taps don't flash it. */
+const LOUPE_AFTER_PX = 6;
+/** A box within this many page units of its fitted size already fits. */
+const FIT_TOLERANCE = 1;
 
 type Drag =
   | { mode: "draw"; x0: number; y0: number }
@@ -40,6 +45,9 @@ interface Props {
   onDoubleTap?: (cx: number, cy: number) => void;
   /** Keyboard: Enter on the page in Draw mode adds a box in the middle of the view. */
   onAddBox?: () => void;
+  /** Phone layout: show the action bubble next to the selected box. */
+  bubble?: boolean;
+  onDeleteSelected?: () => void;
 }
 
 export function PageView({
@@ -56,6 +64,8 @@ export function PageView({
   onPinchZoom,
   onDoubleTap,
   onAddBox,
+  bubble,
+  onDeleteSelected,
 }: Props) {
   const size = doc.pages[pageIndex]!;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,6 +77,9 @@ export function PageView({
   const [rendering, setRendering] = useState(true);
   const [words, setWords] = useState<Word[] | null>(null);
   const [hover, setHover] = useState<Word | null>(null);
+  /** The finger while it drags; shows the magnifier. */
+  const [finger, setFinger] = useState<{ cx: number; cy: number; px: number; py: number } | null>(null);
+  const dragStart = useRef({ x: 0, y: 0 });
 
   // Load the page's words when the Words tool is in use.
   useEffect(() => {
@@ -132,6 +145,7 @@ export function PageView({
     e.stopPropagation();
     capture(e.pointerId);
     drag.current = d;
+    dragStart.current = { x: e.clientX, y: e.clientY };
   };
 
   const capture = (pointerId: number) => {
@@ -177,6 +191,7 @@ export function PageView({
     capture(e.pointerId);
     drag.current = null;
     setDraft(null);
+    setFinger(null);
     panFrom.current = touchMidpoint();
     pinch.current = { d0: fingerSpread(), z0: zoom };
   };
@@ -235,8 +250,14 @@ export function PageView({
 
   const onMove = (e: React.PointerEvent) => {
     if (trackTouch(e)) return;
-    if (drag.current) setDraft(rectAt(drag.current, e));
-    else if (words) {
+    if (drag.current) {
+      setDraft(rectAt(drag.current, e));
+      const moved = Math.hypot(e.clientX - dragStart.current.x, e.clientY - dragStart.current.y);
+      if (e.pointerType === "touch" && (finger || moved >= LOUPE_AFTER_PX)) {
+        const p = toPage(e);
+        setFinger({ cx: e.clientX, cy: e.clientY, px: p.x, py: p.y });
+      }
+    } else if (words) {
       const p = toPage(e);
       setHover(wordAt(words, p.x, p.y) ?? null);
     }
@@ -357,6 +378,7 @@ export function PageView({
     const d = drag.current;
     drag.current = null;
     setDraft(null);
+    setFinger(null);
     if (!d) return;
     // Use the release point itself: the last pointermove may not have rendered yet.
     const current = e.type === "pointercancel" ? null : rectAt(d, e);
@@ -399,6 +421,25 @@ export function PageView({
   // While sweeping, highlight the words the drag will take.
   const sweeping = draft && draft.id === null && tool === "words" ? draft.rect : null;
   const pending = new Set(sweeping && words ? wordsInRect(words, sweeping) : []);
+
+  // The action bubble stays out of the way while anything is being dragged.
+  const selected = bubble && !draft ? shown.find((b) => b.id === selectedId) : undefined;
+  /** What "Fit to words" would make of the selected box: one box per line, as a drag across them does. */
+  const fitted = selected && tool === "words" && words ? lineRects(wordsInRect(words, selected)).map((l) => wordBox(l, size)) : [];
+  const alreadyFits =
+    selected &&
+    fitted.length === 1 &&
+    Math.abs(fitted[0]!.x - selected.x) < FIT_TOLERANCE &&
+    Math.abs(fitted[0]!.y - selected.y) < FIT_TOLERANCE &&
+    Math.abs(fitted[0]!.w - selected.w) < FIT_TOLERANCE &&
+    Math.abs(fitted[0]!.h - selected.h) < FIT_TOLERANCE;
+
+  const fitToWords = () => {
+    if (!selected || !fitted.length) return;
+    let next = updateBox(boxes, selected.id, fitted[0]!);
+    for (const r of fitted.slice(1)) next = addBox(next, { id: newBoxId(), page: pageIndex, ...r });
+    onChange(next);
+  };
 
   return (
     <div className="page" style={{ width: size.width * zoom, height: size.height * zoom }}>
@@ -462,6 +503,34 @@ export function PageView({
           <div className={sweeping ? "sweep" : "box draft"} style={px(draft.rect)} />
         )}
       </div>
+      {selected && (
+        <div
+          className="box-bubble"
+          data-testid="box-bubble"
+          style={bubbleSpot({ x: selected.x * zoom, y: selected.y * zoom, w: selected.w * zoom, h: selected.h * zoom }, size.width * zoom, size.height * zoom)}
+        >
+          {fitted.length > 0 && !alreadyFits && (
+            <button type="button" onClick={fitToWords}>
+              Fit to words
+            </button>
+          )}
+          <button type="button" className="danger" onClick={onDeleteSelected}>
+            Delete box
+          </button>
+        </div>
+      )}
+      {finger && (
+        <Loupe
+          source={canvasRef}
+          size={size}
+          zoom={zoom}
+          peek={peek}
+          finger={finger}
+          boxes={shown}
+          active={draft && !sweeping ? draft.rect : null}
+          highlights={sweeping ? [...pending] : []}
+        />
+      )}
       <p id="page-keys" className="sr-only">
         {tool === "words"
           ? "Click or tap a word, or drag across words, to black them out. With the keyboard: arrow keys move between words, Enter blacks out the current word."

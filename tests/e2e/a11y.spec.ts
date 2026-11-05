@@ -172,3 +172,10 @@ test("leaving the page with boxes asks first; without boxes it doesn't", async (
   await clean.close({ runBeforeUnload: true });
   expect(prompted).toBe(false);
 });
+
+test("reduced motion turns off transitions", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const seconds = await page.locator("button").first().evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
+  expect(seconds).toBeLessThan(0.001);
+});

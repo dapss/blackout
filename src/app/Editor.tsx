@@ -221,7 +221,9 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     doc.kind === "pdf" ? "Click or drag across words to black them out" : "Images have no text layer, so use Draw";
 
   const hint =
-    tool === "words" && wordCount === 0
+    tool === "words" && wordCount === null
+      ? "Finding the words on this page…"
+      : tool === "words" && wordCount === 0
       ? "This page has no selectable text (it may be a scan). Use Draw to cover things by hand."
       : tool === "words" && boxes.length === 0
         ? phone
@@ -253,6 +255,8 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         onPinchZoom={zoomTo}
         onDoubleTap={onDoubleTap}
         onAddBox={addBoxInView}
+        bubble={phone}
+        onDeleteSelected={deleteSelected}
       />
     </div>
   );

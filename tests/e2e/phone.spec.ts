@@ -66,7 +66,7 @@ test("the More menu zooms, peeks and clears the page", async ({ page }) => {
 });
 
 test("Delete appears only while a box is selected", async ({ page }) => {
-  const del = page.getByRole("button", { name: "Delete" });
+  const del = page.getByRole("button", { name: "Delete", exact: true });
   await expect(del).toHaveCount(0);
   await drawBox(page, 0.1, 0.05, 0.6, 0.1);
   await expect(del).toBeVisible();
@@ -96,4 +96,41 @@ test("the page doesn't move when the hint above it changes", async ({ page }) =>
   expect(await top()).toBe(before);
   await page.getByRole("radio", { name: "Words" }).click(); // and to the Words hint
   expect(await top()).toBe(before);
+});
+
+test("a selected box has an action bubble that deletes it", async ({ page }) => {
+  const bubble = page.getByTestId("box-bubble");
+  await expect(bubble).toHaveCount(0);
+  await drawBox(page, 0.3, 0.4, 0.7, 0.45);
+  await expect(bubble).toBeVisible();
+
+  // It sits on the page, clear of the box and its handles.
+  const b = (await bubble.boundingBox())!;
+  const box = (await page.getByTestId("box").boundingBox())!;
+  const layer = (await page.getByTestId("page-layer").boundingBox())!;
+  expect(b.y + b.height).toBeLessThanOrEqual(box.y - 22);
+  expect(b.x).toBeGreaterThanOrEqual(layer.x);
+  expect(b.x + b.width).toBeLessThanOrEqual(layer.x + layer.width);
+  expect((await bubble.getByRole("button", { name: "Delete box" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+
+  // It gets out of the way during a drag.
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 10, cy + 10);
+  await expect(bubble).toHaveCount(0);
+  await page.mouse.up();
+  await expect(bubble).toBeVisible();
+
+  await bubble.getByRole("button", { name: "Delete box" }).click();
+  await expect(page.getByTestId("box")).toHaveCount(0);
+  await expect(bubble).toHaveCount(0);
+});
+
+test("the phone browser bar follows the top bar while a file is open", async ({ page }) => {
+  const light = page.locator('meta[name="theme-color"][media*="light"]');
+  await expect(light).toHaveAttribute("content", "#141414");
+  await page.getByRole("button", { name: "Close file" }).click();
+  await expect(light).toHaveAttribute("content", "#f4f3ef");
 });
