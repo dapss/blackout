@@ -6,12 +6,15 @@ Online tools like iLovePDF, Smallpdf or Acrobat online make you upload a documen
 
 **Try it: [blackout-redact.pages.dev](https://blackout-redact.pages.dev)**
 
+![Blackout finds the email, phone, NIK, IBAN and card number in a made-up rental application, blacks them out, takes the name by hand, and verifies the export.](docs/demo.gif)
+
 ## What it does
 
 - Open a PDF, PNG, JPEG or WebP (drag and drop or file picker).
 - Page thumbnails, zoom, and page navigation.
 - **Draw** black boxes with a mouse, pen or finger. Select, move, resize and delete them, with undo and redo (Ctrl+Z, Ctrl+Shift+Z, Delete, arrow keys to nudge).
 - **Words** (PDFs with a text layer): click a word to black it out, or drag across several words. A drag makes one box per line, so the gaps between words are covered too. The text layer says which words are on a line. The rendered pixels say exactly where they are: each box is fitted to the word's actual ink, so it stays exact on justified, letter-spaced, condensed or kerned text, where PDF text positions are often several points off. When the ink is ambiguous (an underline running through the line, for example), Blackout falls back to a wider, padded box. Word boxes are ordinary boxes, so you can still adjust them. Images and scanned pages have no text layer, so use Draw for those.
+- **Find items** (PDFs with a text layer): looks for emails, phone numbers, card numbers (Luhn checksum), IBANs (mod-97 checksum), and Indonesian NIK and NPWP numbers. Review each finding, accept or reject it, or use "Redact all". Accepted findings become ordinary boxes. This is a helper and it can miss things: it doesn't look for names, addresses or signatures, and it can't read images or scanned pages yet, so please review every page yourself. It runs entirely on your device, using no model downloads or network requests.
 - **Safe-mode export.** Every page is rendered to an image at 200 DPI, the boxes are burned into the pixels, and a brand-new PDF is built from those images. Nothing is copied from the original: no text layer, fonts, metadata, annotations, links, form fields, attachments, JavaScript or earlier revisions. Images are re-encoded as PNG, which drops EXIF data (including GPS location).
 - **Checked before download.** The output is re-opened and inspected. The download is only offered if every check passes, for example `Verified: 0 of 14 redacted items recoverable`:
   - no extractable text on any page (pdf.js `getTextContent`)
@@ -90,7 +93,9 @@ src/
 │  ├─ encode.ts        JPEG/PNG encoding and the new PDF (pdf-lib)
 │  ├─ verify.ts        re-open the output and check it
 │  ├─ words.ts         word positions from the PDF text layer (Words tool)
+│  ├─ detect.ts        find sensitive values in a page's words
 │  └─ geometry.ts      box math
+├─ packs/              what detection looks for, one folder per country (see packs/README.md)
 └─ workers/            export worker (encoding + PDF assembly off the main thread)
 ```
 

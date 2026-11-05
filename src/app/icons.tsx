@@ -11,6 +11,12 @@ const paths: Record<string, ReactNode> = {
       <path d="M20 15.5c-1-1-5-1.5-5 1 0 2 3.5 2 5 0" />
     </>
   ),
+  find: (
+    <>
+      <circle cx="11" cy="11" r="6.5" />
+      <path d="m16 16 4.5 4.5" />
+    </>
+  ),
   undo: (
     <>
       <path d="M9 14 4 9l5-5" />

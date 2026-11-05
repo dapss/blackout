@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type Finding, isCovered } from "../core/detect";
 import { moveRect, resizeRect } from "../core/geometry";
 import type { LoadedDoc } from "../core/load";
 import type { Box } from "../core/types";
@@ -7,6 +8,7 @@ import { addBox, commit, type History, initHistory, newBoxId, redo, removeBox, r
 import { PageView, type Tool } from "./PageView";
 import { PhoneBottomBar, PhoneTopBar } from "./PhoneBars";
 import { scrollAncestorsBy } from "./scroll";
+import { type FindingStatus, ReviewPanel, useDetection } from "./ReviewPanel";
 import { Thumbnails } from "./Thumbnails";
 
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3, 4];
@@ -51,6 +53,12 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   const stageRef = useRef<HTMLDivElement>(null);
   /** Page point that should stay under a screen point after the next zoom change. */
   const zoomAnchor = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null);
+
+  const { scan, start: startScan } = useDetection(doc);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [rejected, setRejected] = useState<ReadonlySet<string>>(new Set());
+  /** A new object each time, so showing the same finding again scrolls back to it. */
+  const [focused, setFocused] = useState<{ id: string } | null>(null);
 
   const boxes = history.present;
   const size = doc.pages[page]!;
@@ -251,6 +259,66 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [exporting, selectedId, boxes, doc.pages, page, change, doUndo, doRedo, deleteSelected, goTo, dismissTip]);
 
+  // A finding counts as blacked out only while a box really covers it, so undoing, moving or deleting
+  // that box puts it back up for review.
+  const findings = scan.state === "done" ? scan.findings : [];
+  const status = (f: Finding): FindingStatus =>
+    isCovered(f, boxes) ? "accepted" : rejected.has(f.id) ? "rejected" : "pending";
+  const unreviewed = findings.filter((f) => status(f) === "pending").length;
+
+  const blackOut = (list: Finding[]) => {
+    let next = boxes;
+    for (const f of list) for (const r of f.rects) next = addBox(next, { id: newBoxId(), page: f.page, ...r });
+    change(next);
+  };
+
+  const openReview = () => {
+    dismissTip();
+    setReviewOpen(true);
+    startScan();
+  };
+
+  const closeReview = () => {
+    setReviewOpen(false);
+    setFocused(null);
+    stageRef.current?.closest(".editor")?.querySelector<HTMLElement>("[data-testid='find-button']")?.focus();
+  };
+
+  const review = reviewOpen && (
+    <ReviewPanel
+      scan={scan}
+      status={status}
+      totalPages={doc.pages.length}
+      focusedId={focused?.id ?? null}
+      onShow={(f) => {
+        goTo(f.page);
+        setFocused({ id: f.id });
+      }}
+      onAccept={(f) => blackOut([f])}
+      onReject={(f) => setRejected((r) => new Set(r).add(f.id))}
+      onRestore={(f) =>
+        setRejected((r) => {
+          const next = new Set(r);
+          next.delete(f.id);
+          return next;
+        })
+      }
+      onAcceptAll={() => blackOut(findings.filter((f) => status(f) === "pending"))}
+      onUseDraw={(p) => {
+        chooseTool("draw");
+        goTo(p);
+      }}
+      onClose={closeReview}
+    />
+  );
+
+  // On the page: what's still up for review, plus whichever finding the user asked to see.
+  const marks = reviewOpen
+    ? findings
+        .filter((f) => f.page === page && (status(f) === "pending" || f.id === focused?.id))
+        .flatMap((f) => f.rects.map((rect, i) => ({ key: `${f.id}-${i}`, id: f.id, rect, active: f.id === focused?.id })))
+    : [];
+
   const multi = doc.pages.length > 1;
   const wordsTitle =
     doc.kind === "pdf" ? "Click or drag across words to black them out" : "Images have no text layer, so use Draw";
@@ -260,7 +328,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     tool === "words" && wordCount === null
       ? "Finding the words on this page…"
       : noText
-      ? "This page has no selectable text (it may be a scan)."
+      ? "This page has no selectable text, so Words and Find can’t run here yet."
       : tool === "words" && boxes.length === 0
         ? phone
           ? "Tap a word to black it out, or drag across several words."
@@ -297,6 +365,8 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         onDoubleTap={onDoubleTap}
         onAddBox={addBoxInView}
         onTwoFingers={() => setGestured(true)}
+        marks={marks}
+        focusMark={focused}
         bubble={phone}
         onDeleteSelected={deleteSelected}
       />
@@ -312,6 +382,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
       <p>
         <b>Draw:</b> drag a box over anything, including signatures and photos.
       </p>
+      <p>Or use Find to look for emails, phone numbers and ID numbers.</p>
       <button
         type="button"
         className="btn"
@@ -325,7 +396,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     </div>
   );
 
-  const dialog = exporting && <ExportDialog doc={doc} boxes={boxes} onClose={() => setExporting(false)} />;
+  const dialog = exporting && <ExportDialog doc={doc} boxes={boxes} unreviewed={unreviewed} onClose={() => setExporting(false)} />;
 
   if (phone) {
     return (
@@ -349,6 +420,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         />
         {stage}
         {tipCard}
+        {review}
         <PhoneBottomBar
           doc={doc}
           tool={tool}
@@ -358,6 +430,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
           page={page}
           counts={counts}
           onTool={chooseTool}
+          onFind={openReview}
           onUndo={doUndo}
           onRedo={doRedo}
           onGoTo={goTo}
@@ -368,7 +441,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   }
 
   return (
-    <div className={`editor${multi ? " has-thumbs" : ""}`}>
+    <div className={`editor${multi ? " has-thumbs" : ""}${reviewOpen ? " has-review" : ""}`}>
       <div className="toolbar" role="toolbar" aria-label="Editing tools">
         <div className="group tool-group">
           <div className="segmented" role="radiogroup" aria-label="Tool">
@@ -394,6 +467,15 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
             title="Adds a box in the middle of the view. Arrow keys move it, Ctrl or Command with arrow keys resizes it."
           >
             Add box
+          </button>
+          <button
+            type="button"
+            className="btn"
+            data-testid="find-button"
+            onClick={openReview}
+            title="Look for emails, phone numbers, card numbers and ID numbers"
+          >
+            Find items
           </button>
           <button type="button" className="btn" onClick={doUndo} disabled={!history.past.length} title="Undo (Ctrl+Z)">
             Undo
@@ -460,6 +542,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
       {multi && <Thumbnails doc={doc} current={page} counts={counts} onSelect={goTo} />}
 
       {stage}
+      {review}
       {dialog}
     </div>
   );

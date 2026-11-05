@@ -210,6 +210,7 @@ interface BottomProps {
   page: number;
   counts: number[];
   onTool: (t: Tool) => void;
+  onFind: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onGoTo: (page: number) => void;
@@ -238,6 +239,10 @@ export function PhoneBottomBar(p: BottomProps) {
             Words
           </button>
         </div>
+        <button type="button" data-testid="find-button" onClick={p.onFind}>
+          <Icon name="find" />
+          Find
+        </button>
         <button type="button" onClick={p.onUndo} disabled={!p.canUndo}>
           <Icon name="undo" />
           Undo

@@ -8,6 +8,12 @@ bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and 
 
 ## Unreleased
 
+### Added
+- Find items: looks through a PDF's selectable text for emails, phone numbers, card numbers, IBANs,
+  and Indonesian NIK and NPWP numbers. Review each finding and accept or reject it, or use "Redact
+  all". Everything runs on your device, and it can miss things, so please still review every page.
+- The export dialog warns you if found items haven't been reviewed yet.
+
 ### Changed
 - A simpler footer: the link to the source is now the only credit on the page.
 

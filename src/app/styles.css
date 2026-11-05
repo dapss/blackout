@@ -309,6 +309,16 @@ button:active:not(:disabled) {
   grid-template-areas: "toolbar toolbar" "thumbs stage";
 }
 
+.editor.has-review {
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas: "toolbar toolbar" "stage review";
+}
+
+.editor.has-thumbs.has-review {
+  grid-template-columns: 132px minmax(0, 1fr) 320px;
+  grid-template-areas: "toolbar toolbar toolbar" "thumbs stage review";
+}
+
 .toolbar {
   grid-area: toolbar;
   display: flex;
@@ -464,6 +474,166 @@ button:active:not(:disabled) {
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
+}
+
+/* Review panel: beside the page on desktop, between the page and the tools on a phone. */
+.review {
+  grid-area: review;
+  align-self: start;
+  position: sticky;
+  top: 60px;
+  max-height: calc(100vh - 60px);
+  overflow: auto;
+  padding: 0 14px 12px;
+  border-left: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.review:focus {
+  outline: none;
+}
+
+.review p {
+  margin: 0 0 10px;
+}
+
+/* Close and Redact all stay in reach however far the list scrolls. */
+.review-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  background: var(--surface);
+}
+
+.review-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.review-all {
+  position: sticky;
+  top: 52px;
+  z-index: 1;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.review-notext {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.review-list {
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.finding {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.finding.focused {
+  box-shadow: inset 3px 0 0 var(--focus);
+  padding-left: 8px;
+}
+
+.finding-show {
+  display: block;
+  width: 100%;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.finding-type {
+  display: block;
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+
+.finding-text {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.finding-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.finding-state {
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.finding.accepted .finding-state {
+  color: var(--ok);
+}
+
+.finding.rejected .finding-text {
+  color: var(--ink-2);
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+.review-note {
+  color: var(--ink-2);
+  font-size: 0.8rem;
+}
+
+.editor.phone .review {
+  position: static;
+  flex: 0 0 auto;
+  max-height: 42vh;
+  border-top: 1px solid var(--line);
+  border-left: 0;
+}
+
+.editor.phone .finding-actions .btn {
+  min-height: 44px;
+  min-width: 96px;
+}
+
+.editor.phone .finding.pending .btn {
+  flex: 1;
+}
+
+/* On the page: fixed colours, because the page is white in both themes. */
+.finding-mark {
+  position: absolute;
+  pointer-events: none;
+  background: rgb(245 196 0 / 35%);
+  outline: 2px solid #8a6d00;
+}
+
+.finding-mark.active {
+  outline: 3px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.export-warning {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fail) 14%, var(--surface));
+  color: var(--fail);
+  font-weight: 600;
 }
 
 /* The first-use tip: under the mode switch on desktop, above it on a phone. */

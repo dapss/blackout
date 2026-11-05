@@ -12,7 +12,15 @@ type State =
   | { step: "done"; result: ExportResult; report: VerifyReport; url: string | null }
   | { step: "error"; message: string };
 
-export function ExportDialog({ doc, boxes, onClose }: { doc: LoadedDoc; boxes: Box[]; onClose: () => void }) {
+interface Props {
+  doc: LoadedDoc;
+  boxes: Box[];
+  /** Found items the user hasn't accepted or rejected yet. */
+  unreviewed: number;
+  onClose: () => void;
+}
+
+export function ExportDialog({ doc, boxes, unreviewed, onClose }: Props) {
   const [state, setState] = useState<State>({ step: "rendering", progress: null });
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -95,6 +103,12 @@ export function ExportDialog({ doc, boxes, onClose }: { doc: LoadedDoc; boxes: B
             {boxes.length === 0 && (
               <p className="muted">
                 You haven’t drawn any boxes, so nothing is blacked out. The file is still flattened and cleaned.
+              </p>
+            )}
+            {unreviewed > 0 && (
+              <p className="export-warning" data-testid="export-unreviewed">
+                {unreviewed === 1 ? "1 found item hasn’t" : `${unreviewed} found items haven’t`} been reviewed, so{" "}
+                {unreviewed === 1 ? "it isn’t" : "they aren’t"} blacked out in this file.
               </p>
             )}
             <ul className="checks" data-testid="verify-checks">

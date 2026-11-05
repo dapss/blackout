@@ -46,6 +46,10 @@ interface Props {
   /** Keyboard: Enter on the page in Draw mode adds a box in the middle of the view. */
   onAddBox?: () => void;
   onTwoFingers?: () => void;
+  /** Findings to show on the page while they're being reviewed. */
+  marks?: { key: string; id: string; rect: Rect; active: boolean }[];
+  /** Scroll this finding into view; a new object scrolls again. */
+  focusMark?: { id: string } | null;
   /** Phone layout: show the action bubble next to the selected box. */
   bubble?: boolean;
   onDeleteSelected?: () => void;
@@ -66,6 +70,8 @@ export function PageView({
   onDoubleTap,
   onAddBox,
   onTwoFingers,
+  marks,
+  focusMark,
   bubble,
   onDeleteSelected,
 }: Props) {
@@ -137,6 +143,10 @@ export function PageView({
       .finally(() => releaseCanvas(off));
     return () => ac.abort();
   }, [doc, pageIndex, renderZoom, size]);
+
+  useEffect(() => {
+    if (focusMark) layerRef.current?.querySelector(`[data-finding-id="${focusMark.id}"]`)?.scrollIntoView({ block: "center", inline: "nearest" });
+  }, [focusMark, pageIndex]);
 
   const toPage = (e: React.PointerEvent): { x: number; y: number } => {
     const r = layerRef.current!.getBoundingClientRect();
@@ -483,6 +493,15 @@ export function PageView({
               style={px(w)}
             />
           ))}
+        {marks?.map((m) => (
+          <div
+            key={m.key}
+            className={`finding-mark${m.active ? " active" : ""}`}
+            data-testid="finding-mark"
+            data-finding-id={m.id}
+            style={px(m.rect)}
+          />
+        ))}
         {shown.map((b, i) => (
           <div
             key={b.id}

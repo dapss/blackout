@@ -189,6 +189,27 @@ export async function makeHardWordsPdf(): Promise<{ pdf: Uint8Array; truth: Trut
   return { pdf: await doc.save(), truth };
 }
 
+/** Made-up values for detection tests, with look-alikes that must not be flagged. */
+export async function makeDetectPdf(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const page = (lines: string[]) => {
+    const p = doc.addPage([595, 842]);
+    lines.forEach((line, i) => p.drawText(line, { x: 72, y: 760 - i * 40, size: 14, font }));
+  };
+  page([
+    "Contact: jane.doe@example.com",
+    "Phone: +62 812-3456-7890",
+    "Card: 4111 1111 1111 1111",
+    "NIK: 3201014512900001",
+    "Reference: 1234567890123456",
+    "Order date: 2024-01-15",
+  ]);
+  page(["IBAN: DE89 3704 0044 0532 0130 00", "NPWP: 01.234.567.8-901.234"]);
+  page([]); // no text, like a scan
+  return doc.save();
+}
+
 const here = dirname(fileURLToPath(import.meta.url));
 
 export async function writeFixtures(dir = here): Promise<void> {
@@ -196,6 +217,7 @@ export async function writeFixtures(dir = here): Promise<void> {
   writeFileSync(join(dir, "dirty.pdf"), await makeDirtyPdf());
   writeFileSync(join(dir, "long-20.pdf"), await makeLongPdf(20));
   writeFileSync(join(dir, "rotated.pdf"), await makeRotatedPdf());
+  writeFileSync(join(dir, "detect.pdf"), await makeDetectPdf());
   const hard = await makeHardWordsPdf();
   writeFileSync(join(dir, "hard-words.pdf"), hard.pdf);
   const round = (_k: string, v: unknown) => (typeof v === "number" ? Math.round(v * 1000) / 1000 : v);
