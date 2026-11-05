@@ -6,6 +6,24 @@ shows which version you are using.
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor versions (0.2, 0.3)
 bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and polish.
 
+## Unreleased
+
+### Added
+- A short tip when you open a PDF explains the two ways to black things out: Words for text, Draw
+  for anything else.
+- A "Use Draw" button on pages with no selectable text.
+
+### Changed
+- PDFs with text now open in Words, which is faster and more exact for names and numbers. Images and
+  scanned PDFs still open in Draw.
+- On phones, the action bubble opens when you tap a box instead of right after you draw one, so it
+  doesn't cover the text around it. It now holds the only Delete button, which leaves more room in
+  the bottom bar.
+- The hint about pinching and scrolling goes away once you've drawn a box or used the gestures.
+
+### Fixed
+- On touch screens, tapping a box could nudge it slightly and add a step to Undo.
+
 ## 0.1.3 (2026-11-05)
 
 ### Added

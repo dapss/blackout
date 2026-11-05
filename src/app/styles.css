@@ -455,6 +455,54 @@ button:active:not(:disabled) {
   margin: 0 0 12px;
 }
 
+.hint-action {
+  margin-left: 4px;
+  padding: 2px 6px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* The first-use tip: under the mode switch on desktop, above it on a phone. */
+.tool-group {
+  position: relative;
+}
+
+.tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 15;
+  width: min(320px, 90vw);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.9rem;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 25%);
+}
+
+.tip p {
+  margin: 6px 0 0;
+}
+
+.tip .btn {
+  margin-top: 10px;
+}
+
+.editor.phone .tip {
+  position: fixed;
+  top: auto;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 72px);
+  left: 12px;
+  width: auto;
+}
+
 /* --- Page and boxes --- */
 
 .page {
@@ -1030,10 +1078,6 @@ button:active:not(:disabled) {
 
 .p-bottom button:disabled {
   opacity: 0.35;
-}
-
-.p-bottom button.danger {
-  color: var(--fail);
 }
 
 .sheet-backdrop {

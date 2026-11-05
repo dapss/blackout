@@ -40,7 +40,7 @@ for (const [mode, t] of [["light", light], ["dark", dark]] as const) {
       ["hint above the page", t["ink-2"]!, t.stage!],
       ["Private chip / Verified", t.ok!, mix(t.ok!, t.surface!, 0.14)],
       ["Check failed", t.fail!, mix(t.fail!, t.surface!, 0.14)],
-      ["Delete on the phone bar", t.fail!, t.surface!],
+      ["Delete in the phone bubble", t.fail!, t.surface!],
       ["primary and phone active tool", t.bg!, t.ink!],
     ];
     for (const [name, fg, bg] of text) {

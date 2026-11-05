@@ -6,16 +6,27 @@ import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 export const FIXTURES = fileURLToPath(new URL("../fixtures", import.meta.url));
 
+/**
+ * Most tests start from Draw with the tip out of the way. This goes through the page's own handlers
+ * without moving keyboard focus, which the keyboard tests depend on; modes.spec.ts covers the real start.
+ */
+async function startInDraw(page: Page) {
+  await page.getByRole("radio", { name: "Draw" }).evaluate((el) => (el as HTMLElement).click());
+  await page.keyboard.press("Escape");
+}
+
 export async function openFixture(page: Page, name: string) {
   await page.getByTestId("file-input").setInputFiles(join(FIXTURES, name));
   await expect(page.getByTestId("page-layer")).toBeVisible();
   await expect(page.locator(".page-loading")).toHaveCount(0);
+  await startInDraw(page);
 }
 
 export async function openBuffer(page: Page, name: string, mimeType: string, buffer: Buffer) {
   await page.getByTestId("file-input").setInputFiles({ name, mimeType, buffer });
   await expect(page.getByTestId("page-layer")).toBeVisible();
   await expect(page.locator(".page-loading")).toHaveCount(0);
+  await startInDraw(page);
 }
 
 /** Drag a box on the current page; coordinates are fractions of the page's width and height. */

@@ -225,3 +225,28 @@ test("a second finger puts the magnifier away", async ({ page }) => {
   await touch(cdp, "touchEnd", []);
   await expect(page.getByTestId("box")).toHaveCount(0);
 });
+
+test("the gesture hint goes away after the first box", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const hint = page.getByTestId("stage-hint");
+  await expect(hint).toContainText("Pinch to zoom");
+  const r = await layerBox(page);
+  const a = { x: r.x + 40, y: r.y + 40 };
+  await touch(cdp, "touchStart", [a]);
+  await swipe(cdp, [a], [{ x: a.x + 120, y: a.y + 50 }]);
+  await touch(cdp, "touchEnd", []);
+  await expect(page.getByTestId("box")).toHaveCount(1);
+  await expect(hint).not.toContainText("Pinch to zoom");
+});
+
+test("the gesture hint goes away after a two-finger scroll", async ({ page }) => {
+  const cdp = await page.context().newCDPSession(page);
+  const hint = page.getByTestId("stage-hint");
+  const r = await layerBox(page);
+  const a = { x: r.x + 100, y: r.y + 200 };
+  const b = { x: r.x + 200, y: r.y + 200 };
+  await touch(cdp, "touchStart", [a]);
+  await touch(cdp, "touchStart", [a, b]);
+  await touch(cdp, "touchEnd", []);
+  await expect(hint).not.toContainText("Pinch to zoom");
+});

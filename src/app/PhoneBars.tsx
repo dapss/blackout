@@ -207,13 +207,11 @@ interface BottomProps {
   wordsTitle: string;
   canUndo: boolean;
   canRedo: boolean;
-  selected: boolean;
   page: number;
   counts: number[];
   onTool: (t: Tool) => void;
   onUndo: () => void;
   onRedo: () => void;
-  onDelete: () => void;
   onGoTo: (page: number) => void;
 }
 
@@ -248,12 +246,6 @@ export function PhoneBottomBar(p: BottomProps) {
           <Icon name="redo" />
           Redo
         </button>
-        {p.selected && (
-          <button type="button" onClick={p.onDelete} className="danger">
-            <Icon name="trash" />
-            Delete
-          </button>
-        )}
         {multi && (
           <button type="button" onClick={() => setPages(true)}>
             <Icon name="pages" />

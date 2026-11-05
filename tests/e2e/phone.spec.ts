@@ -65,16 +65,6 @@ test("the More menu zooms, peeks and clears the page", async ({ page }) => {
   await expect(page.getByTestId("box")).toHaveCount(0);
 });
 
-test("Delete appears only while a box is selected", async ({ page }) => {
-  const del = page.getByRole("button", { name: "Delete", exact: true });
-  await expect(del).toHaveCount(0);
-  await drawBox(page, 0.1, 0.05, 0.6, 0.1);
-  await expect(del).toBeVisible();
-  await del.click();
-  await expect(page.getByTestId("box")).toHaveCount(0);
-  await expect(del).toHaveCount(0);
-});
-
 test("closing asks first when there are boxes, then returns to the start page", async ({ page }) => {
   await drawBox(page, 0.1, 0.05, 0.6, 0.1);
   page.once("dialog", (d) => void d.dismiss());
@@ -98,11 +88,17 @@ test("the page doesn't move when the hint above it changes", async ({ page }) =>
   expect(await top()).toBe(before);
 });
 
-test("a selected box has an action bubble that deletes it", async ({ page }) => {
+test("tapping a box opens its action bubble, which deletes it", async ({ page }) => {
   const bubble = page.getByTestId("box-bubble");
   await expect(bubble).toHaveCount(0);
   await drawBox(page, 0.3, 0.4, 0.7, 0.45);
+  // Finishing a box doesn't open it: it would cover the text around the box.
+  await expect(page.getByTestId("box")).toHaveCount(1);
+  await expect(bubble).toHaveCount(0);
+  await page.getByTestId("box").click();
   await expect(bubble).toBeVisible();
+  // The bubble is the one Delete on a phone.
+  await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
 
   // It sits on the page, clear of the box and its handles.
   const b = (await bubble.boundingBox())!;
@@ -126,6 +122,17 @@ test("a selected box has an action bubble that deletes it", async ({ page }) => 
   await bubble.getByRole("button", { name: "Delete box" }).click();
   await expect(page.getByTestId("box")).toHaveCount(0);
   await expect(bubble).toHaveCount(0);
+});
+
+test("tapping a box doesn't add an undo step, and tapping away closes the bubble", async ({ page }) => {
+  await drawBox(page, 0.3, 0.4, 0.7, 0.45);
+  await page.getByTestId("box").click();
+  await expect(page.getByTestId("box-bubble")).toBeVisible();
+  const layer = (await page.getByTestId("page-layer").boundingBox())!;
+  await page.mouse.click(layer.x + 20, layer.y + layer.height - 20);
+  await expect(page.getByTestId("box-bubble")).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByTestId("box")).toHaveCount(0);
 });
 
 test("the phone browser bar follows the top bar while a file is open", async ({ page }) => {

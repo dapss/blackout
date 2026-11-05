@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -246,6 +247,7 @@ test.describe("on a phone", () => {
     const fit = page.getByRole("button", { name: "Fit to words" });
     await expect(fit).toHaveCount(0); // Draw mode doesn't load the words
     await page.getByRole("radio", { name: "Words" }).click();
+    await box.click();
     await fit.click();
 
     await expect(box).toHaveCount(1);
@@ -265,14 +267,16 @@ test.describe("on a phone", () => {
 
 test("the hint says when it is still finding the words", async ({ page }) => {
   await page.goto("/");
-  await openFixture(page, "dirty.pdf");
   await page.evaluate(() => {
     const seen: string[] = [];
     (window as unknown as { seen: string[] }).seen = seen;
-    const hint = document.querySelector('[data-testid="stage-hint"]')!;
-    new MutationObserver(() => seen.push(hint.textContent ?? "")).observe(hint, { childList: true, characterData: true, subtree: true });
+    new MutationObserver(() => {
+      const hint = document.querySelector('[data-testid="stage-hint"]');
+      if (hint) seen.push(hint.textContent ?? "");
+    }).observe(document.body, { childList: true, characterData: true, subtree: true });
   });
-  await useWords(page, "123-45-6789");
+  await page.getByTestId("file-input").setInputFiles(fileURLToPath(new URL("../fixtures/dirty.pdf", import.meta.url)));
+  await expect(page.locator('[data-testid="word"][data-word="123-45-6789"]')).toHaveCount(1);
   const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen);
   expect(seen.some((t) => t.includes("Finding the words"))).toBe(true);
   await expect(page.getByTestId("stage-hint")).not.toContainText("Finding the words");

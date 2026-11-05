@@ -14,6 +14,9 @@ const MAX_ZOOM = 6;
 /** Double-tap zooms in to this multiple of the fit-to-width zoom. */
 const DOUBLE_TAP_ZOOM = 2.5;
 
+/** The tip about the two modes shows until dismissed, once per visit. Not saved: the app stores nothing. */
+let tipDismissed = false;
+
 function isTyping(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   return !!t && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
@@ -34,7 +37,13 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [zoomMode, setZoomMode] = useState<"fit" | number>("fit");
   const [fitZoom, setFitZoom] = useState(1);
-  const [tool, setTool] = useState<Tool>("draw");
+  // Start in Words where there's text to select. Images have none, and a scan turns out to have none
+  // once its words have been looked for, which moves it to Draw unless the user has already chosen.
+  const [tool, setTool] = useState<Tool>(doc.kind === "pdf" ? "words" : "draw");
+  const autoTool = useRef(doc.kind === "pdf");
+  const [tip, setTip] = useState(doc.kind === "pdf" && !tipDismissed);
+  /** The user has found the touch gestures, so the hint about them can go. */
+  const [gestured, setGestured] = useState(false);
   const [peek, setPeek] = useState(false);
   const [wordCount, setWordCount] = useState<number | null>(null);
   const [touch] = useState(() => window.matchMedia?.("(pointer: coarse)").matches ?? false);
@@ -58,6 +67,31 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   }, [boxes.length, onDirty]);
 
   const change = useCallback((next: Box[]) => setHistory((h) => commit(h, next)), []);
+
+  const chooseTool = useCallback((t: Tool) => {
+    autoTool.current = false;
+    setTool(t);
+  }, []);
+
+  const onWordCount = useCallback((count: number | null) => {
+    setWordCount(count);
+    if (count === null || !autoTool.current) return;
+    autoTool.current = false;
+    if (count === 0) {
+      setTool("draw");
+      setTip(false);
+    }
+  }, []);
+
+  const dismissTip = useCallback(() => {
+    tipDismissed = true;
+    setTip(false);
+  }, []);
+
+  useEffect(() => {
+    if (boxes.length > 0) dismissTip();
+    if (boxes.length > 0 || zoomMode !== "fit") setGestured(true);
+  }, [boxes.length, zoomMode, dismissTip]);
 
   // Fit the page to the available width.
   useEffect(() => {
@@ -195,6 +229,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         deleteSelected();
       } else if (e.key === "Escape") {
         setSelectedId(null);
+        dismissTip();
       } else if (selectedId && e.key.startsWith("Arrow")) {
         const box = boxes.find((b) => b.id === selectedId);
         if (!box) return;
@@ -214,17 +249,18 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [exporting, selectedId, boxes, doc.pages, page, change, doUndo, doRedo, deleteSelected, goTo]);
+  }, [exporting, selectedId, boxes, doc.pages, page, change, doUndo, doRedo, deleteSelected, goTo, dismissTip]);
 
   const multi = doc.pages.length > 1;
   const wordsTitle =
     doc.kind === "pdf" ? "Click or drag across words to black them out" : "Images have no text layer, so use Draw";
 
+  const noText = tool === "words" && wordCount === 0;
   const hint =
     tool === "words" && wordCount === null
       ? "Finding the words on this page…"
-      : tool === "words" && wordCount === 0
-      ? "This page has no selectable text (it may be a scan). Use Draw to cover things by hand."
+      : noText
+      ? "This page has no selectable text (it may be a scan)."
       : tool === "words" && boxes.length === 0
         ? phone
           ? "Tap a word to black it out, or drag across several words."
@@ -232,14 +268,19 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         : boxes.length === 0
           ? "Drag across anything sensitive to black it out."
           : phone
-            ? `${boxes.length} box${boxes.length === 1 ? "" : "es"}. Drag a box to move it.`
+            ? `${boxes.length} box${boxes.length === 1 ? "" : "es"}. Tap a box for options, drag to move it.`
             : `${boxes.length} box${boxes.length === 1 ? "" : "es"} in total. Drag a box to move it, pull its handles to resize.`;
 
   const stage = (
     <div className="stage" ref={stageRef}>
       <p className="hint stage-hint" data-testid="stage-hint">
-        {touch && "Pinch to zoom, two fingers to scroll. "}
+        {touch && !gestured && !noText && "Pinch to zoom, two fingers to scroll. "}
         {hint}
+        {noText && (
+          <button type="button" className="hint-action" onClick={() => chooseTool("draw")}>
+            Use Draw
+          </button>
+        )}
       </p>
       <PageView
         doc={doc}
@@ -251,13 +292,36 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onChange={change}
-        onWordCount={setWordCount}
+        onWordCount={onWordCount}
         onPinchZoom={zoomTo}
         onDoubleTap={onDoubleTap}
         onAddBox={addBoxInView}
+        onTwoFingers={() => setGestured(true)}
         bubble={phone}
         onDeleteSelected={deleteSelected}
       />
+    </div>
+  );
+
+  const tipCard = tip && (
+    <div className="tip" role="status" data-testid="mode-tip">
+      <strong>Two ways to black things out</strong>
+      <p>
+        <b>Words:</b> {phone ? "tap" : "click"} a word, or drag along a line of text.
+      </p>
+      <p>
+        <b>Draw:</b> drag a box over anything, including signatures and photos.
+      </p>
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          dismissTip();
+          layer()?.focus({ preventScroll: true });
+        }}
+      >
+        Got it
+      </button>
     </div>
   );
 
@@ -284,19 +348,18 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
           onOpenFile={onOpenFile}
         />
         {stage}
+        {tipCard}
         <PhoneBottomBar
           doc={doc}
           tool={tool}
           wordsTitle={wordsTitle}
           canUndo={history.past.length > 0}
           canRedo={history.future.length > 0}
-          selected={!!selectedId}
           page={page}
           counts={counts}
-          onTool={setTool}
+          onTool={chooseTool}
           onUndo={doUndo}
           onRedo={doRedo}
-          onDelete={deleteSelected}
           onGoTo={goTo}
         />
         {dialog}
@@ -307,22 +370,23 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   return (
     <div className={`editor${multi ? " has-thumbs" : ""}`}>
       <div className="toolbar" role="toolbar" aria-label="Editing tools">
-        <div className="group">
+        <div className="group tool-group">
           <div className="segmented" role="radiogroup" aria-label="Tool">
-            <button type="button" role="radio" aria-checked={tool === "draw"} onClick={() => setTool("draw")}>
+            <button type="button" role="radio" aria-checked={tool === "draw"} onClick={() => chooseTool("draw")}>
               Draw
             </button>
             <button
               type="button"
               role="radio"
               aria-checked={tool === "words"}
-              onClick={() => setTool("words")}
+              onClick={() => chooseTool("words")}
               disabled={doc.kind !== "pdf"}
               title={wordsTitle}
             >
               Words
             </button>
           </div>
+          {tipCard}
           <button
             type="button"
             className="btn"

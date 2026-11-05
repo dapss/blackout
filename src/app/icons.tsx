@@ -29,14 +29,6 @@ const paths: Record<string, ReactNode> = {
       <path d="M4 7v12.5A1.5 1.5 0 0 0 5.5 21H16" />
     </>
   ),
-  trash: (
-    <>
-      <path d="M4 7h16" />
-      <path d="M10 11v6M14 11v6" />
-      <path d="M6 7l1 13h10l1-13" />
-      <path d="M9 7V4h6v3" />
-    </>
-  ),
   back: <path d="m15 5-7 7 7 7" />,
   more: (
     <>

@@ -162,7 +162,7 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
 
   // Delete button, then boxes on other pages are kept separately.
   await boxes.first().click();
-  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await page.getByRole("button", { name: "Delete" }).click(); // the toolbar's, or the bubble's on a phone
   await expect(boxes).toHaveCount(0);
   await page.getByRole("button", { name: "Next page" }).click();
   await expect(page.getByTestId("page-indicator")).toHaveText("2 / 2");

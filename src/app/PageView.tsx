@@ -17,8 +17,8 @@ const DOUBLE_TAP_MS = 300;
 const DOUBLE_TAP_PX = 30;
 /** While zoom is changing (pinch), re-render the page this long after it settles; it stretches meanwhile. */
 const RENDER_SETTLE_MS = 150;
-/** A finger must drag this far (screen px) before the magnifier appears, so taps don't flash it. */
-const LOUPE_AFTER_PX = 6;
+/** A finger moving less than this (screen px) is tapping, not dragging. */
+const TAP_PX = 6;
 /** A box within this many page units of its fitted size already fits. */
 const FIT_TOLERANCE = 1;
 
@@ -45,6 +45,7 @@ interface Props {
   onDoubleTap?: (cx: number, cy: number) => void;
   /** Keyboard: Enter on the page in Draw mode adds a box in the middle of the view. */
   onAddBox?: () => void;
+  onTwoFingers?: () => void;
   /** Phone layout: show the action bubble next to the selected box. */
   bubble?: boolean;
   onDeleteSelected?: () => void;
@@ -64,6 +65,7 @@ export function PageView({
   onPinchZoom,
   onDoubleTap,
   onAddBox,
+  onTwoFingers,
   bubble,
   onDeleteSelected,
 }: Props) {
@@ -80,6 +82,8 @@ export function PageView({
   /** The finger while it drags; shows the magnifier. */
   const [finger, setFinger] = useState<{ cx: number; cy: number; px: number; py: number } | null>(null);
   const dragStart = useRef({ x: 0, y: 0 });
+  /** The box tapped to show its action bubble. Finishing a new box doesn't: the bubble would cover the text around it. */
+  const [bubbleFor, setBubbleFor] = useState<string | null>(null);
 
   // Load the page's words when the Words tool is in use.
   useEffect(() => {
@@ -194,6 +198,7 @@ export function PageView({
     setFinger(null);
     panFrom.current = touchMidpoint();
     pinch.current = { d0: fingerSpread(), z0: zoom };
+    onTwoFingers?.();
   };
 
   /** Returns true when the event belonged to a two-finger scroll. */
@@ -225,6 +230,7 @@ export function PageView({
 
   const onLayerDown = (e: React.PointerEvent) => {
     onSelect(null);
+    setBubbleFor(null);
     const p = toPage(e);
     begin(e, tool === "words" ? { mode: "sweep", x0: p.x, y0: p.y } : { mode: "draw", x0: p.x, y0: p.y });
     setDraft({ id: null, rect: { x: p.x, y: p.y, w: 0, h: 0 } });
@@ -253,7 +259,7 @@ export function PageView({
     if (drag.current) {
       setDraft(rectAt(drag.current, e));
       const moved = Math.hypot(e.clientX - dragStart.current.x, e.clientY - dragStart.current.y);
-      if (e.pointerType === "touch" && (finger || moved >= LOUPE_AFTER_PX)) {
+      if (e.pointerType === "touch" && (finger || moved >= TAP_PX)) {
         const p = toPage(e);
         setFinger({ cx: e.clientX, cy: e.clientY, px: p.x, py: p.y });
       }
@@ -408,7 +414,11 @@ export function PageView({
       onChange(addBox(boxes, box));
       onSelect(box.id);
     } else {
-      onChange(updateBox(boxes, d.id, current.rect));
+      // A tap opens the bubble, and a finger's small wobble doesn't count as moving the box. That goes
+      // for handles too: on touch their grab areas can cover a small box completely.
+      const moved = Math.hypot(e.clientX - dragStart.current.x, e.clientY - dragStart.current.y);
+      if (moved < (e.pointerType === "touch" ? TAP_PX : 1)) setBubbleFor(d.id);
+      else onChange(updateBox(boxes, d.id, current.rect));
     }
   };
 
@@ -423,7 +433,7 @@ export function PageView({
   const pending = new Set(sweeping && words ? wordsInRect(words, sweeping) : []);
 
   // The action bubble stays out of the way while anything is being dragged.
-  const selected = bubble && !draft ? shown.find((b) => b.id === selectedId) : undefined;
+  const selected = bubble && !draft && bubbleFor === selectedId ? shown.find((b) => b.id === selectedId) : undefined;
   /** What "Fit to words" would make of the selected box: one box per line, as a drag across them does. */
   const fitted = selected && tool === "words" && words ? lineRects(wordsInRect(words, selected)).map((l) => wordBox(l, size)) : [];
   const alreadyFits =
