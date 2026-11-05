@@ -6,7 +6,7 @@ shows which version you are using.
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor versions (0.2, 0.3)
 bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and polish.
 
-## Unreleased
+## 0.2.0 (2026-11-05)
 
 ### Added
 - Find items: looks through a PDF's selectable text for emails, phone numbers, card numbers, IBANs,
