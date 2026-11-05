@@ -61,7 +61,7 @@ jobs:
         env:
           CI: "true"
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ !cancelled() && hashFiles('test-results/**/trace.zip') != '' }}
         with:
           name: playwright-traces-${{ matrix.os }}
           path: test-results
