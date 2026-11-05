@@ -6,7 +6,7 @@ shows which version you are using.
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor versions (0.2, 0.3)
 bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and polish.
 
-## Unreleased
+## 0.1.3 (2026-11-05)
 
 ### Added
 - A magnifier on touch screens: while you drag, it shows what's under your finger, so you can see
