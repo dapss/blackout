@@ -1,6 +1,5 @@
 import type { Box, Rect } from "../core/types";
 
-/** Undo/redo stack over immutable snapshots. */
 export interface History<T> {
   past: T[];
   present: T;
@@ -13,7 +12,6 @@ export function initHistory<T>(present: T): History<T> {
   return { past: [], present, future: [] };
 }
 
-/** Record a new state. Committing the current state again is a no-op. */
 export function commit<T>(h: History<T>, next: T): History<T> {
   if (next === h.present) return h;
   return { past: [...h.past, h.present].slice(-HISTORY_LIMIT), present: next, future: [] };
@@ -29,7 +27,7 @@ export function redo<T>(h: History<T>): History<T> {
   return { past: [...h.past, h.present], present: h.future[0]!, future: h.future.slice(1) };
 }
 
-// --- Box list operations (pure, return the same array when nothing changes) ---
+// Box operations return the same array when nothing changes.
 
 let counter = 0;
 export function newBoxId(): string {

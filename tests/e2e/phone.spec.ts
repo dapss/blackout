@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { drawBox, openFixture } from "./helpers";
 
-// The phone layout applies up to 720px wide, in every browser.
 test.use({ viewport: { width: 390, height: 844 } });
 
 test.beforeEach(async ({ page }) => {
@@ -11,15 +10,13 @@ test.beforeEach(async ({ page }) => {
 
 test("the page gets the screen, with tools at the bottom and Export at the top", async ({ page }) => {
   const layer = (await page.getByTestId("page-layer").boundingBox())!;
-  expect(layer.y).toBeLessThan(260); // was ~460px with the desktop toolbar wrapped onto a phone
+  expect(layer.y).toBeLessThan(260);
   await expect(page.getByRole("navigation", { name: "Editing tools" })).toBeInViewport();
   await expect(page.getByTestId("export-button")).toBeInViewport();
-  // The start-page chrome makes way for the editor.
   await expect(page.getByTestId("privacy-banner")).toHaveCount(0);
   await expect(page.locator("footer")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
-  // The page scrolls inside the editor; the bars stay put.
   await page.locator(".stage").evaluate((s) => s.scrollTo(0, s.scrollHeight));
   await expect(page.getByRole("navigation", { name: "Editing tools" })).toBeInViewport();
   await expect(page.getByTestId("export-button")).toBeInViewport();
@@ -81,10 +78,10 @@ test("closing asks first when there are boxes, then returns to the start page", 
 test("the page doesn't move when the hint above it changes", async ({ page }) => {
   const top = async () => (await page.getByTestId("page-layer").boundingBox())!.y;
   const before = await top();
-  await drawBox(page, 0.1, 0.05, 0.6, 0.1); // hint switches from "Drag across…" to "1 box…"
+  await drawBox(page, 0.1, 0.05, 0.6, 0.1);
   await expect(page.getByTestId("box")).toHaveCount(1);
   expect(await top()).toBe(before);
-  await page.getByRole("radio", { name: "Words" }).click(); // and to the Words hint
+  await page.getByRole("radio", { name: "Words" }).click();
   expect(await top()).toBe(before);
 });
 
@@ -97,10 +94,8 @@ test("tapping a box opens its action bubble, which deletes it", async ({ page })
   await expect(bubble).toHaveCount(0);
   await page.getByTestId("box").click();
   await expect(bubble).toBeVisible();
-  // The bubble is the one Delete on a phone.
   await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
 
-  // It sits on the page, clear of the box and its handles.
   const b = (await bubble.boundingBox())!;
   const box = (await page.getByTestId("box").boundingBox())!;
   const layer = (await page.getByTestId("page-layer").boundingBox())!;
@@ -109,7 +104,6 @@ test("tapping a box opens its action bubble, which deletes it", async ({ page })
   expect(b.x + b.width).toBeLessThanOrEqual(layer.x + layer.width);
   expect((await bubble.getByRole("button", { name: "Delete box" }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
 
-  // It gets out of the way during a drag.
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
   await page.mouse.move(cx, cy);

@@ -28,7 +28,6 @@ async function helveticaMeasure(): Promise<Measure> {
   return (text) => font.widthOfTextAtSize(text, 100);
 }
 
-/** Text-layer estimate for page 1, plus the page rendered at SCALE (Node canvas). */
 async function loadPage(name: string, measure?: Measure) {
   const task = pdfjs.getDocument({ data: fixture(name), verbosity: 0, standardFontDataUrl: STANDARD_FONTS });
   const pdf = await task.promise;
@@ -54,7 +53,6 @@ async function loadPage(name: string, measure?: Measure) {
   return { estimate, img, size };
 }
 
-/** Ink extent of one word, measured straight from the pixels inside its true advance range. */
 function inkOf(img: PixelData, line: TruthLine, x0: number, x1: number) {
   const lum = (x: number, y: number) => {
     const i = (y * img.width + x) * 4;
@@ -134,12 +132,10 @@ describe("snapWordsToInk on the hard fixture", () => {
       words.forEach((w, i) => {
         const box = wordBox(w, size);
         const ink = inks[i]!;
-        // Covers all of the word's ink...
         expect(box.x).toBeLessThanOrEqual(ink.x0);
         expect(box.x + box.w).toBeGreaterThanOrEqual(ink.x1);
         expect(box.y).toBeLessThanOrEqual(ink.y0);
         expect(box.y + box.h).toBeGreaterThanOrEqual(ink.y1);
-        // ...and none of the next or previous word's.
         if (inks[i + 1]) expect(box.x + box.w).toBeLessThan(inks[i + 1]!.x0);
         if (inks[i - 1]) expect(box.x).toBeGreaterThan(inks[i - 1]!.x1);
       });
@@ -152,13 +148,10 @@ describe("snapWordsToInk on the hard fixture", () => {
     const ssn = snapped.find((w) => w.text === "SSN")!;
     const num = snapped.find((w) => w.text === "123-45-6789")!;
     expect(ssn.snapped && num.snapped).toBe(true);
-    expect(ssn.y + ssn.h).toBeLessThan(num.y); // separate, in reading order down the page
+    expect(ssn.y + ssn.h).toBeLessThan(num.y);
   });
 });
 
-// --- Synthetic pixels ----------------------------------------------------------------------
-
-/** White image with black rectangles (x0, x1 in px; rows fixed to the text band). */
 function strip(width: number, blocks: [number, number][], extra?: (px: Uint8ClampedArray, w: number) => void): PixelData {
   const height = 40;
   const data = new Uint8ClampedArray(width * height * 4).fill(255);
@@ -230,12 +223,9 @@ describe("selection helpers", () => {
 
   it("wordsInRect takes the words a flat line runs through", () => {
     const y = words[0]!.y + words[0]!.h / 2;
-    // Perfectly level, and with a little height from an unsteady hand.
     expect(wordsInRect(words, { x: 0, y, w: 100, h: 0 }).map((x) => x.text)).toEqual(["a", "b", "c"]);
     expect(wordsInRect(words, { x: 0, y, w: 100, h: 1 }).map((x) => x.text)).toEqual(["a", "b", "c"]);
-    // Stopping at the start of a word doesn't take it.
     expect(wordsInRect(words, { x: 0, y, w: 41, h: 0 }).map((x) => x.text)).toEqual(["a"]);
-    // In the gap between lines, it takes nothing.
     expect(wordsInRect(words, { x: 0, y: 30, w: 100, h: 0 })).toEqual([]);
   });
 

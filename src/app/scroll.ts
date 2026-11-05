@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-/** Scroll the nearest scrollable ancestors (the stage, then the page) by a pixel delta. */
 export function scrollAncestorsBy(el: HTMLElement, dx: number, dy: number): void {
   for (let n = el.parentElement; n && (Math.abs(dx) >= 0.5 || Math.abs(dy) >= 0.5); n = n.parentElement) {
     const left = n.scrollLeft;

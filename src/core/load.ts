@@ -11,19 +11,16 @@ import {
   wordsFromText,
 } from "./words";
 
-/** Pixels per page unit for fitting word boxes to ink. */
 const WORD_SNAP_SCALE = 3;
 
 export const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp";
 
-/** A loaded document: page sizes in page units plus a way to draw any page. */
 export interface LoadedDoc {
   kind: DocKind;
   name: string;
   pages: PageSize[];
-  /** Draw page `index` (0-based) at `scale` into a context already sized for it. */
   draw(index: number, ctx: Any2D, scale: number, signal?: AbortSignal): Promise<void>;
-  /** Words of the text layer on page `index`, in page units. Empty for images and scanned pages. */
+  /** Empty for images and scanned pages. */
   words(index: number): Promise<Word[]>;
   destroy(): void;
 }
@@ -92,7 +89,6 @@ async function loadPdf(name: string, bytes: Uint8Array): Promise<LoadedDoc> {
       canvasMeasure(),
     );
     if (!estimate.length) return estimate;
-    // Render the page and fit each word to its ink (about 0.33 pt per pixel).
     const scale = fitScale(size, WORD_SNAP_SCALE);
     const { w, h } = canvasSize(size, scale);
     const canvas = createCanvas(w, h);
@@ -101,7 +97,7 @@ async function loadPdf(name: string, bytes: Uint8Array): Promise<LoadedDoc> {
       await drawPage(index, ctx, scale);
       return snapWordsToInk(estimate, ctx.getImageData(0, 0, w, h), scale);
     } catch {
-      return estimate; // padded estimates are still usable
+      return estimate;
     } finally {
       releaseCanvas(canvas);
     }
@@ -137,10 +133,8 @@ async function loadImage(name: string, file: Blob): Promise<LoadedDoc> {
     kind: "image",
     name,
     pages: [{ width: bitmap.width, height: bitmap.height }],
-    // Images have no text layer; finding words in them would need OCR.
     words: async () => [],
     async draw(_index, ctx, scale) {
-      // Transparent areas become white, the same as a PDF page.
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.imageSmoothingEnabled = true;
@@ -153,7 +147,6 @@ async function loadImage(name: string, file: Blob): Promise<LoadedDoc> {
   };
 }
 
-/** Measure text on a canvas; widths are only used as ratios. Falls back to character counts. */
 function canvasMeasure(): Measure {
   let ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D | null = null;
   try {

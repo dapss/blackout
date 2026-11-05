@@ -1,11 +1,9 @@
 import type { PageSize, Rect, ResizeHandle } from "./types";
 
-/** Smallest box the editor keeps, in page units. */
 export const MIN_BOX_SIZE = 2;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** Rectangle spanned by two corner points, clipped to the page. */
 export function rectFromPoints(x0: number, y0: number, x1: number, y1: number, page: PageSize): Rect {
   const ax = clamp(Math.min(x0, x1), 0, page.width);
   const ay = clamp(Math.min(y0, y1), 0, page.height);
@@ -14,7 +12,6 @@ export function rectFromPoints(x0: number, y0: number, x1: number, y1: number, p
   return { x: ax, y: ay, w: bx - ax, h: by - ay };
 }
 
-/** Translate a rectangle, keeping it fully on the page. */
 export function moveRect(r: Rect, dx: number, dy: number, page: PageSize): Rect {
   return {
     x: clamp(r.x + dx, 0, Math.max(0, page.width - r.w)),
@@ -24,7 +21,6 @@ export function moveRect(r: Rect, dx: number, dy: number, page: PageSize): Rect 
   };
 }
 
-/** Drag one edge or corner of a rectangle. Edges can't cross each other or leave the page. */
 export function resizeRect(r: Rect, handle: ResizeHandle, dx: number, dy: number, page: PageSize): Rect {
   let left = r.x;
   let top = r.y;
@@ -41,10 +37,7 @@ export function isUsableRect(r: Rect): boolean {
   return r.w >= MIN_BOX_SIZE && r.h >= MIN_BOX_SIZE;
 }
 
-/**
- * Convert a page-unit rectangle to whole device pixels at `scale`, grown outward by `pad` pixels
- * and clipped to the canvas. Rounding outward means a box never covers less than the user drew.
- */
+/** Rounds outward, so a box never covers less than the user drew. */
 export function toPixelRect(r: Rect, scale: number, pad: number, maxW: number, maxH: number): Rect {
   const x0 = clamp(Math.floor(r.x * scale) - pad, 0, maxW);
   const y0 = clamp(Math.floor(r.y * scale) - pad, 0, maxH);
@@ -71,14 +64,9 @@ export function innerPixelRect(r: Rect, scale: number, inset: number, maxW: numb
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
 }
 
-/** Size of the touch magnifier, in screen pixels. */
 export const LOUPE_SIZE = 120;
 
-/**
- * Where the touch magnifier goes: above and to the side of the finger, so the finger never covers
- * it. It prefers the left (a right thumb reaches in from the lower right), and slides down beside
- * the finger when there's no room above.
- */
+/** Above and beside the finger, so it's never covered. Prefers the left, away from a right thumb. */
 export function loupeSpot(fingerX: number, fingerY: number, viewW: number, viewH: number): { left: number; top: number } {
   const margin = 8;
   const side = 28;
@@ -93,11 +81,7 @@ export function loupeSpot(fingerX: number, fingerY: number, viewW: number, viewH
 const BUBBLE_GAP = 26;
 const BUBBLE_HEIGHT = 50;
 
-/**
- * Where the action bubble goes on the page, in screen pixels: above the box, below it if there's no
- * room, and just inside its top edge if it fills the page. Lined up with the box's side nearer the
- * page edge, so it stays on the page.
- */
+/** Above the box, below it if there's no room, inside its top edge if it fills the page. */
 export function bubbleSpot(box: Rect, pageW: number, pageH: number): { top: number; left?: number; right?: number } {
   const above = box.y - BUBBLE_GAP - BUBBLE_HEIGHT;
   const below = box.y + box.h + BUBBLE_GAP;

@@ -17,7 +17,6 @@ cd "$dir"
 curl -fsS "$SITE/" -o index.html
 curl -fsS "$SITE/favicon.svg" -o favicon.svg
 
-# The page names its script and stylesheet; the script names the two workers it starts.
 names="$(grep -oE 'assets/[A-Za-z0-9._]+-[A-Za-z0-9_-]{8}\.(js|mjs|css)' index.html | sort -u)"
 for path in $names; do curl -fsS "$SITE/$path" -o "$(basename "$path")"; done
 workers="$(cat ./*.js | grep -oE '(export\.worker|pdf\.worker\.min)-[A-Za-z0-9_-]{8}\.m?js' | sort -u)"

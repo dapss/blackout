@@ -1,6 +1,4 @@
-// Finds sensitive values in a page's text. Works on the same words as the Words tool: line by line,
-// then again across lines that wrap, so a value split in two is covered whole rather than in part.
-// Pure code over plain data, so it also runs under Node.
+// Finds sensitive values in a page's text, line by line and again across lines that wrap.
 import { DETECTORS } from "../packs";
 import type { Detector } from "../packs/types";
 import { validators } from "../packs/validators";
@@ -19,7 +17,6 @@ export interface Finding {
   detectorId: string;
   label: string;
   text: string;
-  /** Where a redaction box goes: one per line. */
   rects: Rect[];
 }
 
@@ -30,13 +27,11 @@ const COLUMN_GAP_EM = 2.5;
 /** The furthest apart two lines of one paragraph can be, baseline to baseline, in font sizes. */
 const MAX_LINE_STEP_EM = 2.4;
 const MIN_LINE_STEP_EM = 0.6;
-/** Line breaks here need no space when the lines are joined back together. */
 const BREAKS_WITHOUT_SPACE = /[\-‐-―@]$/;
 
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
 const GROUP_SEPARATOR = /[ \-‐-―]/;
 
-/** The match stands alone: it isn't the middle of a longer word or number. */
 function standsAlone(text: string, start: number, end: number): boolean {
   const before = text[start - 1];
   const after = text[end];
@@ -56,7 +51,6 @@ function standsAloneInNumber(text: string, start: number, end: number, loose: bo
 
 const passes = (detector: Detector, value: string) => !detector.validator || validators[detector.validator](value);
 
-/** Candidates within one pattern match, for detectors whose values are printed in groups. */
 function groupMatches(text: string, start: number, end: number, detector: Detector): { start: number; end: number }[] {
   const [min, max] = detector.groups!;
   const groups: { start: number; end: number; size: number }[] = [];
@@ -113,11 +107,9 @@ const along = (w: Word) => (w.axis === "v" ? w.y : w.x);
 const lengthOf = (w: Word) => (w.axis === "v" ? w.h : w.w);
 const inReadingOrder = (line: Word[]) =>
   [...line].sort((a, b) => (line[0]!.reversed ? along(b) - along(a) : along(a) - along(b)));
-/** Space between two neighbouring words, in reading order. */
 const gapBetween = (prev: Word, w: Word) =>
   prev.reversed ? along(prev) - (along(w) + lengthOf(w)) : along(w) - (along(prev) + lengthOf(prev));
 
-/** A line's words in reading order, as text, with which word each character came from. */
 export function lineText(line: Word[]): { text: string; wordAt: number[]; words: Word[] } {
   const words = inReadingOrder(line);
   let text = "";
@@ -136,7 +128,6 @@ export function lineText(line: Word[]): { text: string; wordAt: number[]; words:
   return { text, wordAt, words };
 }
 
-/** The parts of a line in separate columns, as in a table row or a two-column page. */
 function columnsOf(line: Word[]): Word[][] {
   const columns: Word[][] = [];
   inReadingOrder(line).forEach((w, i, words) => {
@@ -147,17 +138,15 @@ function columnsOf(line: Word[]): Word[][] {
   return columns;
 }
 
-/** Which way the next line lies across the reading direction: rotated pages read in other directions. */
+/** Rotated pages read in other directions. */
 const nextLineDirection = (w: Word) => ((w.axis === "h") === w.reversed ? -1 : 1);
 
-/** How far along the line two pieces of text overlap, in page units. */
 function overlap(a: Word[], b: Word[]): number {
   const start = (l: Word[]) => Math.min(...l.map(along));
   const end = (l: Word[]) => Math.max(...l.map((w) => along(w) + lengthOf(w)));
   return Math.min(end(a), end(b)) - Math.max(start(a), start(b));
 }
 
-/** Could `b` be where the text of `a` carries on after a line break? */
 function carriesOn(a: Word[], b: Word[]): boolean {
   const x = a[0]!;
   const y = b[0]!;
@@ -167,7 +156,6 @@ function carriesOn(a: Word[], b: Word[]): boolean {
   return step >= MIN_LINE_STEP_EM * x.size && step <= MAX_LINE_STEP_EM * x.size && overlap(a, b) > 0;
 }
 
-/** Follows each piece of text to the line that carries it on, giving one list of lines per paragraph. */
 function paragraphs(lines: Word[][]): Word[][][] {
   const pieces = lines
     .filter((l) => l[0]!.axis)
@@ -196,11 +184,9 @@ function paragraphs(lines: Word[][]): Word[][][] {
 interface Hit {
   detector: Detector;
   text: string;
-  /** The whole words the match touches, in reading order. */
   words: Word[];
 }
 
-/** Matches that only exist once a paragraph's lines are put back together. */
 function wrappedHits(lines: Word[][], detectors: Detector[]): Hit[] {
   const hits: Hit[] = [];
   for (const chain of paragraphs(lines)) {
@@ -230,10 +216,9 @@ function wrappedHits(lines: Word[][], detectors: Detector[]): Hit[] {
 }
 
 /**
- * Findings on one page. A box covers each whole word a match touches, so nothing is left half-covered.
- * A value that wraps replaces the piece of it found on the first line, which could look complete: the
- * start of a phone number is a valid phone number. It doesn't take text from a separate value, so one
- * table row running into the next stays as two findings.
+ * A box covers each whole word a match touches, so nothing is left half-covered. A value that wraps
+ * replaces the piece found on its first line, which could look complete: the start of a phone number
+ * is a valid phone number. It can't take text from a separate value, so table rows stay separate.
  */
 export function findingsOnPage(words: Word[], page: number, size: PageSize, detectors: Detector[] = DETECTORS): Finding[] {
   const lines = groupLines(words)

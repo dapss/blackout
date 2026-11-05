@@ -54,8 +54,7 @@ test("a 20-page PDF exports quickly without freezing the UI", async ({ page }) =
     }, 16);
   });
   const started = Date.now();
-  // Progress is reported page by page while the export runs. Watched from inside the page, because
-  // polling from here can miss updates on a fast machine.
+  // Watched from inside the page, because polling from here can miss updates on a fast machine.
   await page.evaluate(() => {
     const w = window as unknown as { __statuses: Set<string> };
     w.__statuses = new Set();
@@ -79,6 +78,5 @@ test("a 20-page PDF exports quickly without freezing the UI", async ({ page }) =
   console.log(`20 pages exported+verified in ${elapsed} ms; longest main-thread stall ${Math.round(maxGap)} ms`);
   expect(elapsed).toBeLessThan(60_000);
   expect(statuses.filter((s) => / of 20/.test(s)).length).toBeGreaterThan(3);
-  // The UI never locks up: the main thread is never blocked for more than half a second.
   expect(maxGap).toBeLessThan(500);
 });

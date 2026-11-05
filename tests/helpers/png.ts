@@ -1,4 +1,3 @@
-// Minimal PNG writer for tests (Node only).
 import { crc32, deflateSync } from "node:zlib";
 
 function chunk(type: string, data: Uint8Array): Buffer {
@@ -10,7 +9,6 @@ function chunk(type: string, data: Uint8Array): Buffer {
   return Buffer.concat([len, body, crc]);
 }
 
-/** RGB PNG filled by `pixel(x, y)`, with optional extra chunks inserted before IDAT. */
 export function makePng(
   width: number,
   height: number,
@@ -43,7 +41,6 @@ export function makePng(
   );
 }
 
-/** Insert an EXIF APP1 segment carrying `description` right after a JPEG's SOI marker. */
 export function addJpegExif(jpeg: Uint8Array, description: string): Uint8Array {
   const text = Buffer.from(description + "\0", "latin1");
   // TIFF header (little endian) + one IFD with a single ImageDescription (0x010E) entry.

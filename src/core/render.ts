@@ -7,7 +7,6 @@ export type Any2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D
 export const MAX_CANVAS_AREA = 16_000_000;
 export const MAX_CANVAS_SIDE = 16_384;
 
-/** Largest scale <= `wanted` at which the page still fits in one canvas. */
 export function fitScale(size: PageSize, wanted: number): number {
   let s = wanted;
   const area = size.width * size.height * s * s;
@@ -35,7 +34,6 @@ export function get2d(c: AnyCanvas): Any2D {
   return ctx;
 }
 
-/** Free a canvas's backing store right away instead of waiting for GC. */
 export function releaseCanvas(c: AnyCanvas): void {
   c.width = 0;
   c.height = 0;

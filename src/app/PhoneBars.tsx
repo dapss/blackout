@@ -1,4 +1,3 @@
-// Phone layout chrome: a slim top bar, the page in between, and a toolbar within thumb reach.
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { LoadedDoc } from "../core/load";
 import { useDialogFocus } from "./focus";
@@ -7,7 +6,6 @@ import type { Tool } from "./PageView";
 import { PrivacySteps } from "./Privacy";
 import { Thumbnails } from "./Thumbnails";
 
-/** A panel that slides up from the bottom of the screen. */
 function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useDialogFocus(ref, onClose);
@@ -61,7 +59,6 @@ export function PhoneTopBar(p: TopProps) {
 
   const menuItems = () => [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role^=menuitem]:not(:disabled)") ?? [])];
 
-  // Opening the menu moves focus to its first item, as a menu button should.
   useEffect(() => {
     if (menu) menuItems()[0]?.focus();
   }, [menu]);
@@ -71,7 +68,6 @@ export function PhoneTopBar(p: TopProps) {
     if (refocus) moreRef.current?.focus();
   };
 
-  /** Arrow keys move between items, Home/End jump, Escape closes, Tab leaves the menu. */
   const onMenuKey = (e: React.KeyboardEvent) => {
     const items = menuItems();
     const i = items.indexOf(document.activeElement as HTMLButtonElement);
@@ -90,7 +86,6 @@ export function PhoneTopBar(p: TopProps) {
     } else if (e.key === "Tab") closeMenu(false);
   };
 
-  // Close the menu on any tap outside it.
   useEffect(() => {
     if (!menu) return;
     const onDown = (e: PointerEvent) => {

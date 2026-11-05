@@ -1,4 +1,3 @@
-/** What "nothing is uploaded" means, and how anyone can check it. */
 export function PrivacySteps() {
   return (
     <ol>

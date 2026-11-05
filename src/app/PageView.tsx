@@ -19,7 +19,6 @@ const DOUBLE_TAP_PX = 30;
 const RENDER_SETTLE_MS = 150;
 /** A finger moving less than this (screen px) is tapping, not dragging. */
 const TAP_PX = 6;
-/** A box within this many page units of its fitted size already fits. */
 const FIT_TOLERANCE = 1;
 
 type Drag =
@@ -38,19 +37,14 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onChange: (boxes: Box[]) => void;
-  /** Reports how many words the current page's text layer has (null while loading). */
   onWordCount?: (count: number | null) => void;
-  /** Pinch: zoom to `zoom`, keeping the page point under (cx, cy) in place. */
   onPinchZoom?: (zoom: number, cx: number, cy: number) => void;
   onDoubleTap?: (cx: number, cy: number) => void;
-  /** Keyboard: Enter on the page in Draw mode adds a box in the middle of the view. */
   onAddBox?: () => void;
   onTwoFingers?: () => void;
-  /** Findings to show on the page while they're being reviewed. */
   marks?: { key: string; id: string; rect: Rect; active: boolean }[];
   /** Scroll this finding into view; a new object scrolls again. */
   focusMark?: { id: string } | null;
-  /** Phone layout: show the action bubble next to the selected box. */
   bubble?: boolean;
   onDeleteSelected?: () => void;
 }
@@ -85,13 +79,11 @@ export function PageView({
   const [rendering, setRendering] = useState(true);
   const [words, setWords] = useState<Word[] | null>(null);
   const [hover, setHover] = useState<Word | null>(null);
-  /** The finger while it drags; shows the magnifier. */
   const [finger, setFinger] = useState<{ cx: number; cy: number; px: number; py: number } | null>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   /** The box tapped to show its action bubble. Finishing a new box doesn't: the bubble would cover the text around it. */
   const [bubbleFor, setBubbleFor] = useState<string | null>(null);
 
-  // Load the page's words when the Words tool is in use.
   useEffect(() => {
     setWords(null);
     setHover(null);
@@ -175,7 +167,6 @@ export function PageView({
   const panFrom = useRef<{ x: number; y: number } | null>(null);
   const pinch = useRef<{ d0: number; z0: number } | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
-  /** A word tap waiting to see whether a second tap makes it a double-tap. */
   const pendingTap = useRef<{ timer: ReturnType<typeof setTimeout>; x: number; y: number } | null>(null);
   useEffect(() => () => clearTimeout(pendingTap.current?.timer), []);
 
@@ -211,7 +202,6 @@ export function PageView({
     onTwoFingers?.();
   };
 
-  /** Returns true when the event belonged to a two-finger scroll. */
   const trackTouch = (e: React.PointerEvent): boolean => {
     if (e.pointerType !== "touch" || !touches.current.has(e.pointerId)) return false;
     if (e.type === "pointermove") {
@@ -279,10 +269,6 @@ export function PageView({
     }
   };
 
-  /**
-   * A tap on touch. Returns true when it completed a double-tap (zoom), which the caller then
-   * doesn't treat as a tap.
-   */
   const isDoubleTap = (e: React.PointerEvent): boolean => {
     if (e.pointerType !== "touch" || !onDoubleTap) return false;
     const now = performance.now();
@@ -298,7 +284,6 @@ export function PageView({
     return false;
   };
 
-  /** Click a word: black it out, or select the box that already covers it. */
   const redactWordAt = (x: number, y: number): "added" | "covered" | null => {
     const word = words && wordAt(words, x, y);
     if (!word) return null;
@@ -316,9 +301,8 @@ export function PageView({
     return "added";
   };
 
-  // --- Keyboard: the page is one Tab stop; in Words mode arrow keys walk the words. ---
+  // Keyboard: the page is one Tab stop; in Words mode arrow keys walk the words.
 
-  /** Words in reading order, grouped by line. */
   const lines = useMemo(() => {
     if (!words) return [];
     return groupLines(words)
@@ -351,7 +335,6 @@ export function PageView({
     const current = cursor && ordered.includes(cursor) ? cursor : null;
     const i = current ? ordered.indexOf(current) : -1;
     const lineIndex = current ? lines.findIndex((l) => l.includes(current)) : -1;
-    /** The word on another line closest (horizontally) to the current one. */
     const onLine = (li: number) => {
       const line = lines[li];
       if (!line) return undefined;
@@ -380,7 +363,6 @@ export function PageView({
   const redactRef = useRef(redactWordAt);
   redactRef.current = redactWordAt;
 
-  /** Drag across words: one box per line, so the gaps between words are covered too. */
   const redactWordsIn = (r: Rect) => {
     const picked = words ? wordsInRect(words, r) : [];
     if (!picked.length) return;
@@ -418,7 +400,6 @@ export function PageView({
         pendingTap.current = { timer, x: d.x0, y: d.y0 };
       } else redactWordAt(d.x0, d.y0);
     } else if (d.mode === "draw") {
-      // Ignore clicks and tiny accidental drags (under ~4 screen pixels).
       if (!isUsableRect(current.rect) || current.rect.w * zoom < 4 || current.rect.h * zoom < 4) return;
       const box: Box = { id: newBoxId(), page: pageIndex, ...current.rect };
       onChange(addBox(boxes, box));
@@ -438,13 +419,10 @@ export function PageView({
 
   const px = (r: Rect) => ({ left: r.x * zoom, top: r.y * zoom, width: r.w * zoom, height: r.h * zoom });
 
-  // While sweeping, highlight the words the drag will take.
   const sweeping = draft && draft.id === null && tool === "words" ? draft.rect : null;
   const pending = new Set(sweeping && words ? wordsInRect(words, sweeping) : []);
 
-  // The action bubble stays out of the way while anything is being dragged.
   const selected = bubble && !draft && bubbleFor === selectedId ? shown.find((b) => b.id === selectedId) : undefined;
-  /** What "Fit to words" would make of the selected box: one box per line, as a drag across them does. */
   const fitted = selected && tool === "words" && words ? lineRects(wordsInRect(words, selected)).map((l) => wordBox(l, size)) : [];
   const alreadyFits =
     selected &&

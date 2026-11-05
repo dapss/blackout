@@ -1,11 +1,7 @@
-// Checks that turn a pattern match into a real finding. Packs refer to these by name.
-
 const digitsOf = (s: string) => s.replace(/\D/g, "");
 
-/** Every digit the same, as in placeholders like 0000 0000 0000 0000. */
 const allSame = (digits: string) => /^(\d)\1*$/.test(digits);
 
-/** A short pattern repeated, as in 1212121212121212. */
 const repeating = (digits: string) => /^(\d{1,4})\1+$/.test(digits);
 
 export function luhn(digits: string): boolean {
@@ -65,7 +61,6 @@ export function isIban(text: string): boolean {
   return remainder === 1;
 }
 
-/** Province codes in use, the first two digits of a NIK. */
 const NIK_PROVINCES = new Set([
   11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 31, 32, 33, 34, 35, 36, 51, 52, 53, 61, 62, 63, 64, 65, 71, 72, 73, 74, 75,
   76, 81, 82, 91, 92, 93, 94, 95, 96,

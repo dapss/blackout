@@ -14,7 +14,6 @@ export interface ExportResult {
   bytes: Uint8Array;
   mime: string;
   fileName: string;
-  /** Pixels per page unit used for each page; the verifier uses it to find the boxes again. */
   scales: number[];
   pageCount: number;
 }
@@ -28,11 +27,9 @@ export interface ExportOptions {
   dpi?: number;
   onProgress?: (p: ExportProgress) => void;
   signal?: AbortSignal;
-  /** Force the main-thread encoder (browsers without OffscreenCanvas in workers). */
   inline?: boolean;
 }
 
-/** Paint the boxes as fully opaque black, whatever state the context is in. */
 export function burnBoxes(ctx: Any2D, boxesPx: Rect[]): void {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -49,7 +46,6 @@ export function redactedFileName(name: string, kind: DocKind): string {
   return `${base}.redacted.${kind === "pdf" ? "pdf" : "png"}`;
 }
 
-/** Where rendered, already-redacted pages go to be encoded and assembled. */
 interface PageSink {
   add(canvas: AnyCanvas, page: Omit<EncodedPage, "bytes">): Promise<void>;
   finish(kind: DocKind): Promise<Uint8Array>;
@@ -73,10 +69,7 @@ class InlineSink implements PageSink {
 
 let sharedWorker: Worker | null = null;
 
-/**
- * Start the export worker ahead of time. Called at startup so its script is fetched during the
- * initial page load and exporting makes no network requests.
- */
+/** Started at page load so exporting makes no network requests. */
 export function warmExportWorker(): void {
   if (sharedWorker || !workerExportSupported()) return;
   sharedWorker = new Worker(new URL("../workers/export.worker.ts", import.meta.url), {
@@ -154,10 +147,6 @@ class WorkerSink implements PageSink {
 
 let nextInspectId = 0;
 
-/**
- * Structural check of an exported PDF (pdf-lib re-parse plus a revision count) in the export
- * worker, so a large file never blocks the page. Runs inline where workers aren't available.
- */
 export function inspectStructureInWorker(bytes: Uint8Array, pages: number): Promise<Record<string, string[]>> {
   warmExportWorker();
   const worker = sharedWorker;
@@ -194,11 +183,7 @@ export function workerExportSupported(): boolean {
 
 const nextTask = () => new Promise<void>((r) => setTimeout(r, 0));
 
-/**
- * Safe-mode export: render each page to pixels, burn the boxes in, and rebuild a new file.
- * Pages are handled one at a time and each canvas is released before the next, so memory stays
- * flat for long documents.
- */
+/** Pages are handled one at a time, releasing each canvas, so memory stays flat on long documents. */
 export async function exportSafe(doc: LoadedDoc, boxes: Box[], opts: ExportOptions = {}): Promise<ExportResult> {
   const dpi = opts.dpi ?? DEFAULT_DPI;
   const sink: PageSink = !opts.inline && workerExportSupported() ? new WorkerSink() : new InlineSink();
@@ -223,7 +208,6 @@ export async function exportSafe(doc: LoadedDoc, boxes: Box[], opts: ExportOptio
         heightPt: size.height,
       });
       scales.push(scale);
-      // Let the browser paint progress and handle input between pages.
       await nextTask();
     }
     const bytes = await sink.finish(doc.kind);

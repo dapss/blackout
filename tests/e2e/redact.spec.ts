@@ -24,12 +24,10 @@ test("shows the privacy banner and links to the source", async ({ page }) => {
   const footer = page.locator("footer");
   await expect(footer.getByRole("link", { name: "Source on GitHub" })).toHaveAttribute("href", "https://github.com/dapss/blackout");
   await expect(footer.getByRole("link", { name: /Apache-2.0/ })).toBeVisible();
-  // The build shows which commit it came from, linked to the source.
   const version = footer.getByTestId("build-version");
   await expect(version).toHaveText(/^v\d+\.\d+\.\d+ · [0-9a-f]{7} \(verify\)$/);
   await expect(version.getByRole("link").first()).toHaveAttribute("href", /github\.com\/dapss\/blackout\/commit\/[0-9a-f]{40}$/);
   await expect(version.getByRole("link", { name: "verify" })).toHaveAttribute("href", /#verify-this-copy$/);
-  // Test builds aren't releases, so they are labelled as previews pointing at the released site.
   await expect(footer.getByTestId("preview-label")).toHaveAttribute("href", "https://blackout-redact.pages.dev");
 });
 
@@ -42,7 +40,6 @@ test("text PDF: the export has zero extractable text and nothing else from the o
   const { name, bytes } = await exportAndDownload(page, 1);
   expect(name).toBe("dirty.redacted.pdf");
 
-  // Acceptance: getTextContent on every page returns nothing, not even the unredacted text.
   const out = await pdfTextItems(bytes);
   expect(out.pages).toBe(2);
   expect(out.items).toBe(0);
@@ -50,7 +47,6 @@ test("text PDF: the export has zero extractable text and nothing else from the o
   expect(out.text).not.toContain(OTHER_TEXT);
   expect(Buffer.from(bytes).toString("latin1")).not.toContain("Jane Secret");
 
-  // Acceptance: no metadata, annotations, attachments or forms.
   const findings = await inspectPdfStructure(bytes, 2);
   for (const [id, list] of Object.entries(findings)) expect(list, id).toEqual([]);
   const task = pdfjs.getDocument({ data: bytes.slice(), verbosity: 0 });
@@ -74,7 +70,6 @@ test("the export keeps the displayed page geometry of a rotated page", async ({ 
 });
 
 test("image: the exported PNG has no EXIF and the box is burned in", async ({ page }) => {
-  // Make a real JPEG in the browser, then add an EXIF block with a marker string.
   const jpegB64 = await page.evaluate(async () => {
     const c = document.createElement("canvas");
     c.width = 320;
@@ -118,7 +113,6 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
   await drawBox(page, 0.5, 0.1, 0.7, 0.16);
   await expect(boxes).toHaveCount(2);
 
-  // Move the first box by dragging its body.
   const first = boxes.first();
   const before = (await first.boundingBox())!;
   await page.mouse.move(before.x + before.width / 2, before.y + before.height / 2);
@@ -130,7 +124,6 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
   expect(moved.y).toBeCloseTo(before.y + 30, 0);
   expect(moved.width).toBeCloseTo(before.width, 0);
 
-  // Resize from the south-east handle (visible on the selected box).
   const handle = first.locator('[data-handle="se"]');
   const hb = (await handle.boundingBox())!;
   await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
@@ -142,7 +135,6 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
   expect(resized.height).toBeCloseTo(moved.height + 15, 0);
   expect(resized.x).toBeCloseTo(moved.x, 0);
 
-  // Undo the resize, then the move.
   await undoBtn.click();
   expect((await first.boundingBox())!.width).toBeCloseTo(moved.width, 0);
   await undoBtn.click();
@@ -150,7 +142,6 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
   await redoBtn.click();
   expect((await first.boundingBox())!.x).toBeCloseTo(moved.x, 0);
 
-  // Delete with the keyboard, undo with Ctrl+Z, redo with Ctrl+Shift+Z.
   await first.click();
   await page.keyboard.press("Delete");
   await expect(boxes).toHaveCount(1);
@@ -159,7 +150,6 @@ test("boxes can be drawn, moved, resized, deleted, undone and redone", async ({ 
   await page.keyboard.press("ControlOrMeta+Shift+z");
   await expect(boxes).toHaveCount(1);
 
-  // Delete button, then boxes on other pages are kept separately.
   await boxes.first().click();
   await page.getByRole("button", { name: "Delete" }).click(); // the toolbar's, or the bubble's on a phone
   await expect(boxes).toHaveCount(0);

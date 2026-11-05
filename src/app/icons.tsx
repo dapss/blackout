@@ -1,4 +1,3 @@
-// Small stroke icons for the phone toolbar (24px grid, drawn to match the app's line weight).
 import type { ReactNode } from "react";
 
 const paths: Record<string, ReactNode> = {

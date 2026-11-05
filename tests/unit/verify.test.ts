@@ -36,7 +36,6 @@ function solid(w: number, h: number, v: number): PixelData {
 
 const box = (over: Partial<Box> = {}): Box => ({ id: "b1", page: 0, x: 10, y: 10, w: 20, h: 10, ...over });
 
-/** What safe mode produces: an image-only PDF built from page bitmaps. */
 async function safePdf(pages = 2): Promise<Uint8Array> {
   const png = makePng(60, 80, (x, y) => (x >= 10 && x < 40 && y >= 10 && y < 30 ? [0, 0, 0] : [255, 255, 255]));
   return buildSafePdf(Array.from({ length: pages }, () => ({ bytes: png, format: "png" as const, widthPt: 60, heightPt: 80 })));
@@ -182,7 +181,6 @@ describe("PNG checks", () => {
     const info = inspectPng(clean);
     expect(info).toMatchObject({ valid: true, width: 3, height: 3, disallowed: [] });
     expect(info.chunks).toEqual(["IHDR", "IDAT", "IEND"]);
-    // Same pixel data as a PNG that never had the extra chunks.
     expect(Buffer.from(clean).equals(Buffer.from(makePng(3, 3, () => [10, 20, 30])))).toBe(true);
   });
 
@@ -193,7 +191,6 @@ describe("PNG checks", () => {
         { kind: "image", bytes: png, boxes: [box({ x: 2, y: 2, w: 6, h: 6 })], pageCount: 1, scales: [scale] },
         {
           rasterizePng: async () => {
-            // Black only where the box lands at scale 2.
             const px = solid(40, 40, 255);
             for (let y = 4; y < 16; y++) for (let x = 4; x < 16; x++) px.data.fill(0, (y * 40 + x) * 4, (y * 40 + x) * 4 + 3);
             return px;

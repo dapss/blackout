@@ -1,4 +1,3 @@
-// Keyboard-only use, focus handling and the unsaved-changes warning.
 import { expect, type Page, test } from "@playwright/test";
 import { drawBox, openFixture, pdfTextItems } from "./helpers";
 import { readFileSync } from "node:fs";
@@ -54,11 +53,10 @@ test.describe("desktop keyboard", () => {
     for (let i = 0; i < 5; i++) await page.keyboard.press("ControlOrMeta+Shift+ArrowRight");
     for (let i = 0; i < 3; i++) await page.keyboard.press("ArrowDown");
     const after = (await box.boundingBox())!;
-    expect(after.width).toBeGreaterThan(before.width + 20); // 5 steps of 10 page units
+    expect(after.width).toBeGreaterThan(before.width + 20);
     expect(after.x).toBeCloseTo(before.x, 0);
     expect(after.y).toBeGreaterThan(before.y);
 
-    // Export, and keyboard focus stays inside the dialog until it closes.
     await tabTo(page, (el) => el.testid === "export-button", true);
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("verify-summary")).toContainText("nothing under your box", { timeout: 120_000 });
@@ -76,7 +74,6 @@ test.describe("desktop keyboard", () => {
     const bytes = new Uint8Array(readFileSync((await download.path())!));
     expect((await pdfTextItems(bytes)).items).toBe(0);
 
-    // Escape closes it and focus goes back to Export.
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("export-dialog")).toHaveCount(0);
     expect(await activeTestId(page)).toBe("export-button");

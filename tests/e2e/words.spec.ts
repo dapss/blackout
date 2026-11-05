@@ -14,7 +14,6 @@ async function secretSpan(prefix: string, upTo: string) {
   return { x0: 76 + font.widthOfTextAtSize(prefix, 18), x1: 76 + font.widthOfTextAtSize(upTo, 18) };
 }
 
-/** Scroll so page-unit `y` is mid-screen, then return the screen point for (x, y). */
 async function toScreen(page: Page, x: number, y: number, pageWidth = PAGE_W) {
   let r = (await page.getByTestId("page-layer").boundingBox())!;
   const s = r.width / pageWidth;
@@ -33,7 +32,6 @@ async function toScreen(page: Page, x: number, y: number, pageWidth = PAGE_W) {
   return { x: r.x + x * s, y: r.y + y * s };
 }
 
-/** A box's position in page units. */
 async function boxInPage(page: Page, index = 0, pageWidth = PAGE_W) {
   const r = (await page.getByTestId("page-layer").boundingBox())!;
   const b = (await page.getByTestId("box").nth(index).boundingBox())!;
@@ -46,7 +44,6 @@ interface Ink {
   x1: number;
   y0: number;
   y1: number;
-  /** Canvas pixels per page unit. */
   k: number;
 }
 
@@ -95,9 +92,8 @@ async function readInk(page: Page, pageWidth: number, lines: Pick<TruthLine, "ba
   );
 }
 
-/** The box covers all of the word's ink and none of its neighbours'. */
 function expectExact(box: { x0: number; x1: number; y0: number; y1: number }, ink: Ink, prev?: Ink, next?: Ink, label = "") {
-  const tol = 1 / ink.k; // one canvas pixel
+  const tol = 1 / ink.k;
   expect(box.x0, label).toBeLessThanOrEqual(ink.x0 + tol);
   expect(box.x1, label).toBeGreaterThanOrEqual(ink.x1 - tol);
   expect(box.y0, label).toBeLessThanOrEqual(ink.y0 + tol);
@@ -138,7 +134,7 @@ test.describe("on a plain PDF", () => {
     const b = await toScreen(page, line.x1 - 2, BASELINE - 6);
     await page.mouse.move(a.x, a.y);
     await page.mouse.down();
-    await page.mouse.move(b.x, a.y, { steps: 6 }); // exactly level, no height at all
+    await page.mouse.move(b.x, a.y, { steps: 6 });
     await expect(page.locator(".word.pending")).toHaveCount(2);
     await page.mouse.up();
 
@@ -155,7 +151,6 @@ test.describe("on a plain PDF", () => {
     await page.mouse.down();
     await page.mouse.move((a.x + b.x) / 2, b.y, { steps: 3 });
     await page.mouse.move(b.x, b.y, { steps: 3 });
-    // The words the drag will take are highlighted before release.
     await expect(page.locator(".word.pending")).toHaveCount(2);
     await page.mouse.up();
 
@@ -163,7 +158,6 @@ test.describe("on a plain PDF", () => {
     const [ink] = (await readInk(page, PAGE_W, [{ baseline: BASELINE, size: 18, words: [{ text: SECRET, ...line }] }]))[0]!;
     expectExact(await boxInPage(page), ink!);
 
-    // It is an ordinary box: undo removes it.
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByTestId("box")).toHaveCount(0);
   });
@@ -243,7 +237,6 @@ test.describe("on a phone", () => {
     await useWords(page, "123-45-6789");
     const word = (await page.locator('[data-testid="word"][data-word="123-45-6789"]').boundingBox())!;
 
-    // Draw a rough box around the word with plenty of room to spare.
     await page.getByRole("radio", { name: "Draw" }).click();
     await page.mouse.move(word.x - 6, word.y - 12);
     await page.mouse.down();
@@ -261,12 +254,11 @@ test.describe("on a phone", () => {
     await expect(box).toHaveCount(1);
     const tight = (await box.boundingBox())!;
     expect(tight.height).toBeLessThan(rough.height);
-    // Still covers the whole word.
     expect(tight.x).toBeLessThanOrEqual(word.x + 1);
     expect(tight.y).toBeLessThanOrEqual(word.y + 1);
     expect(tight.x + tight.width).toBeGreaterThanOrEqual(word.x + word.width - 1);
     expect(tight.y + tight.height).toBeGreaterThanOrEqual(word.y + word.height - 1);
-    await expect(fit).toHaveCount(0); // it fits now
+    await expect(fit).toHaveCount(0);
 
     await page.getByRole("button", { name: "Undo" }).click();
     expect((await box.boundingBox())!.height).toBeCloseTo(rough.height, 0);

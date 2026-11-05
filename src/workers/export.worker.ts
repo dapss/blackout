@@ -1,5 +1,3 @@
-// Encodes redacted page bitmaps, assembles the output file, and re-parses it for the export check,
-// all off the main thread.
 import { buildSafePdf, type EncodedPage, encodeCanvas, type WorkerReply, type WorkerRequest } from "../core/encode";
 import { inspectPdfStructure } from "../core/verify";
 

@@ -34,7 +34,6 @@ const rasterizePng: PngRasterizer = async (bytes) => {
   return px;
 };
 
-/** Re-open an export in this browser and run every check in `verify.ts`. */
 export function verifyInBrowser(result: ExportResult, boxes: Box[]): Promise<VerifyReport> {
   startPdfWorker();
   return verifyExport(

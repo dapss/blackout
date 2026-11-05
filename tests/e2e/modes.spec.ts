@@ -1,5 +1,4 @@
-// Which mode a file opens in, and the tip that explains the two modes. These open files directly,
-// not through the helpers, which skip this start on purpose.
+// These open files directly, not through the helpers, which skip this start on purpose.
 import { fileURLToPath } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -21,7 +20,6 @@ async function tapWord(page: Page) {
   await page.mouse.click(w.x + w.width / 2, w.y + w.height / 2);
 }
 
-/** A PDF whose pages each have the given text, or nothing, like a scan. */
 async function pdfWithPages(pages: (string | null)[]): Promise<Buffer> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -44,7 +42,6 @@ test("a PDF with text opens in Words, with a tip about both modes", async ({ pag
   await expect(tip(page)).toContainText("signatures and photos");
   await expect(page.locator('[data-testid="word"][data-word="123-45-6789"]')).toHaveCount(1);
 
-  // Words works straight away.
   await tapWord(page);
   await expect(page.getByTestId("box")).toHaveCount(1);
 });
@@ -59,7 +56,6 @@ test("the tip stays clear of the mode switch and goes away for the rest of the v
   await page.getByRole("button", { name: "Got it" }).click();
   await expect(tip(page)).toHaveCount(0);
 
-  // Opening another file doesn't bring it back.
   await page.getByTestId("file-input").setInputFiles(DIRTY);
   await expect(page.locator(".page-loading")).toHaveCount(0);
   await expect(mode(page, "Words")).toBeChecked();
@@ -75,7 +71,7 @@ test("the tip stays clear of the mode switch and goes away for the rest of the v
 test("Escape dismisses the tip, and so does making a first box", async ({ page }) => {
   await page.getByTestId("file-input").setInputFiles(DIRTY);
   await expect(tip(page)).toBeVisible();
-  await expect(page.locator('[data-testid="word"][data-word="123-45-6789"]')).toHaveCount(1); // fully loaded
+  await expect(page.locator('[data-testid="word"][data-word="123-45-6789"]')).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(tip(page)).toHaveCount(0);
 
@@ -107,7 +103,6 @@ test("a page with no text in a PDF offers a way to Draw", async ({ page }) => {
   await page.getByRole("button", { name: "Got it" }).click();
 
   await page.getByRole("button", { name: "Next page" }).click();
-  // Having read a page already, it stays in the mode the user can see, and says what to do.
   await expect(mode(page, "Words")).toBeChecked();
   const hint = page.getByTestId("stage-hint");
   await expect(hint).toContainText("no selectable text");

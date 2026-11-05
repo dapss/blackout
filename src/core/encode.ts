@@ -1,4 +1,3 @@
-// Encoding and PDF assembly. Shared by the export worker and the main-thread fallback.
 import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import type { AnyCanvas } from "./render";
 import type { DocKind } from "./types";
@@ -10,7 +9,6 @@ export type ImageFormat = "jpg" | "png";
 export interface EncodedPage {
   bytes: Uint8Array;
   format: ImageFormat;
-  /** Output page size in PDF points. */
   widthPt: number;
   heightPt: number;
 }

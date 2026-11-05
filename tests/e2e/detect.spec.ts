@@ -1,4 +1,3 @@
-// Find items: from scanning through review to a verified export, on a fixture of made-up values.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { exportAndDownload, openBuffer, openFixture, pdfTextItems } from "./helpers";
@@ -57,7 +56,6 @@ test("finds each type on the pages it's on, and not the look-alikes, with no net
   await expect(panel).not.toContainText("1234567890123456");
   await expect(panel).not.toContainText("2024-01-15");
 
-  // Nothing is blacked out until the user says so, and nothing went over the network.
   await expect(page.getByTestId("box")).toHaveCount(0);
   expect(requests).toEqual([]);
 });
@@ -105,7 +103,6 @@ test("accept, reject, then Redact all, through a verified export", async ({ page
   const email = finding(page, "intl.email");
   const phone = finding(page, "intl.phone");
 
-  // Marks show what's up for review, and an accepted box lands exactly where its mark was.
   await expect(page.getByTestId("finding-mark")).toHaveCount(4);
   const mark = (await page.locator('[data-finding-id="0-0"]').boundingBox())!;
   await action(email, "Accept").click();
@@ -120,12 +117,11 @@ test("accept, reject, then Redact all, through a verified export", async ({ page
   await expect(phone).toHaveAttribute("data-status", "rejected");
   await expect(page.getByTestId("finding-mark")).toHaveCount(2);
 
-  // Rejected stays rejected through Redact all; it covers the 4 still pending, on both pages.
   await page.getByRole("button", { name: "Redact all (4)" }).click();
   await expect(page.locator('[data-testid="finding"][data-status="accepted"]')).toHaveCount(5);
   await expect(phone).toHaveAttribute("data-status", "rejected");
   await expect(page.getByRole("button", { name: "Redact all" })).toBeDisabled();
-  await expect(page.getByTestId("box")).toHaveCount(3); // page 1: email, card, NIK
+  await expect(page.getByTestId("box")).toHaveCount(3);
 
   await page.getByTestId("export-button").click();
   await expect(page.getByTestId("verify-summary")).toBeVisible({ timeout: 120_000 });
@@ -143,13 +139,11 @@ test("a finding is only blacked out while a box really covers it", async ({ page
   await action(email, "Accept").click();
   await expect(email).toHaveAttribute("data-status", "accepted");
 
-  // Undo.
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(email).toHaveAttribute("data-status", "pending");
   await page.getByRole("button", { name: "Redo" }).click();
   await expect(email).toHaveAttribute("data-status", "accepted");
 
-  // Deleting the box.
   await page.getByTestId("box").click();
   await page.keyboard.press("Delete");
   await expect(page.getByTestId("box")).toHaveCount(0);

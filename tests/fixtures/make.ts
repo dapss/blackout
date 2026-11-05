@@ -1,4 +1,3 @@
-// Builds the PDF fixtures used by the unit and end-to-end tests.
 // Run with `pnpm fixtures`; the outputs are committed so tests don't depend on this script.
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -45,7 +44,6 @@ export async function makeDirtyPdf(pages = 2): Promise<Uint8Array> {
     const h = page.getHeight();
     page.drawText(`${OTHER_TEXT} page ${i + 1}`, { x: 72, y: h - 60, size: 14, font });
     if (i === 0) {
-      // Baseline sits inside SECRET_RECT (top-left 100..130 => bottom-left 712..742).
       page.drawText(SECRET, { x: 76, y: h - 124, size: 18, font, color: rgb(0, 0, 0) });
     }
   }
@@ -75,7 +73,6 @@ export async function makeDirtyPdf(pages = 2): Promise<Uint8Array> {
   return doc.save();
 }
 
-/** A plain multi-page text PDF (for the performance test). */
 export async function makeLongPdf(pages: number): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.TimesRoman);
@@ -93,7 +90,6 @@ export async function makeLongPdf(pages: number): Promise<Uint8Array> {
   return doc.save();
 }
 
-/** A PDF whose page has /Rotate 90, to check that output geometry follows what is displayed. */
 export async function makeRotatedPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -103,7 +99,6 @@ export async function makeRotatedPdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
-/** Where each word of a line really is: advance-box extents in top-left page units. */
 export interface TruthLine {
   label: string;
   baseline: number;
@@ -161,7 +156,6 @@ export async function makeHardWordsPdf(): Promise<{ pdf: Uint8Array; truth: Trut
     ops.push(PDFOperator.of(PDFOperatorNames.ShowTextAdjusted, [arr]), endText());
     page.pushOperators(...ops);
 
-    // Walk the glyphs the same way a PDF renderer does to find each word's extent.
     const words: TruthLine["words"] = [];
     let pos = x;
     let current: { text: string; x0: number; x1: number } | null = null;
@@ -189,7 +183,6 @@ export async function makeHardWordsPdf(): Promise<{ pdf: Uint8Array; truth: Trut
   return { pdf: await doc.save(), truth };
 }
 
-/** Made-up values for detection tests, with look-alikes that must not be flagged. */
 export async function makeDetectPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -206,7 +199,7 @@ export async function makeDetectPdf(): Promise<Uint8Array> {
     "Order date: 2024-01-15",
   ]);
   page(["IBAN: DE89 3704 0044 0532 0130 00", "NPWP: 01.234.567.8-901.234"]);
-  page([]); // no text, like a scan
+  page([]);
   return doc.save();
 }
 

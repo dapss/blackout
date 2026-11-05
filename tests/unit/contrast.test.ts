@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 
 const css = readFileSync(new URL("../../src/app/styles.css", import.meta.url), "utf8");
 
-/** Custom properties declared in the first block matching `selector`. */
 function tokens(selector: RegExp): Record<string, string> {
   const start = css.search(selector);
   const body = css.slice(css.indexOf("{", start) + 1, css.indexOf("}", start));
@@ -27,7 +26,6 @@ const ratio = (a: string, b: string) => {
   const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x);
   return (hi! + 0.05) / (lo! + 0.05);
 };
-/** color-mix(in srgb, a p%, b), as the tinted chips use. */
 const mix = (a: string, b: string, p: number) =>
   "#" + rgb(a).map((v, i) => Math.round(v * p + rgb(b)[i]! * (1 - p)).toString(16).padStart(2, "0")).join("");
 

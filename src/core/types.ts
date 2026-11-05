@@ -6,7 +6,6 @@ export interface Rect {
   h: number;
 }
 
-/** A redaction box drawn by the user on one page (0-based index). */
 export interface Box extends Rect {
   id: string;
   page: number;

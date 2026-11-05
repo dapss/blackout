@@ -11,7 +11,6 @@ const SECURITY_HEADERS = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
 
-/** Adds the CSP as a <meta> tag, as a header on `vite preview`, and as a `_headers` file for static hosts. */
 function csp(): Plugin {
   let dev = false;
   return {
@@ -51,7 +50,6 @@ function csp(): Plugin {
   };
 }
 
-/** The commit being built: GitHub Actions sets GITHUB_SHA; locally, ask git. */
 function buildCommit(): string {
   if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
   try {
@@ -64,7 +62,6 @@ function buildCommit(): string {
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version: string };
 
 export default defineConfig({
-  // Shown in the footer so people can see exactly which code they are running.
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_COMMIT__: JSON.stringify(buildCommit()),

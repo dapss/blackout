@@ -82,7 +82,6 @@ export function App() {
     return () => window.removeEventListener("beforeunload", onLeave);
   }, []);
 
-  // Match the phone browser's bar to the page, or to the top bar once a file is open.
   useEffect(() => {
     for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
       meta.content = (phoneEditing ? meta.dataset.editing : meta.dataset.page) ?? meta.content;

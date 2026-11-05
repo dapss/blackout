@@ -13,7 +13,7 @@ interface Props {
   layout?: "rail" | "grid";
 }
 
-/** Page strip. Thumbnails render one at a time so a long PDF never holds many canvases at once. */
+/** Thumbnails render one at a time so a long PDF never holds many canvases at once. */
 export function Thumbnails({ doc, current, counts, onSelect, layout = "rail" }: Props) {
   const [urls, setUrls] = useState<(string | undefined)[]>([]);
 

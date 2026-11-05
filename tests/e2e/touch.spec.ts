@@ -14,7 +14,6 @@ async function touch(cdp: CDPSession, type: "touchStart" | "touchMove" | "touchE
   });
 }
 
-/** Move fingers from `from` to `to` in a few steps. */
 async function swipe(cdp: CDPSession, from: Pt[], to: Pt[], steps = 6) {
   for (let i = 1; i <= steps; i++) {
     const at = from.map((f, k) => ({ x: f.x + ((to[k]!.x - f.x) * i) / steps, y: f.y + ((to[k]!.y - f.y) * i) / steps }));
@@ -61,7 +60,6 @@ test("two fingers scroll the page and draw nothing", async ({ page }) => {
     document.querySelector(".stage")!.scrollTop = 0;
   });
   const r = (await page.getByTestId("page-layer").boundingBox())!;
-  // Start above the bottom toolbar, on the page.
   const y0 = Math.min(r.y + r.height - 20, 520);
   const start = [
     { x: r.x + 100, y: y0 },
@@ -69,7 +67,6 @@ test("two fingers scroll the page and draw nothing", async ({ page }) => {
   ];
   const end = start.map((p) => ({ x: p.x, y: p.y - 150 }));
 
-  // The first finger starts a box; the second one turns the gesture into a scroll.
   await touch(cdp, "touchStart", [start[0]!]);
   await swipe(cdp, [start[0]!], [{ x: start[0]!.x + 30, y: start[0]!.y - 20 }], 2);
   await touch(cdp, "touchStart", [{ x: start[0]!.x + 30, y: start[0]!.y - 20 }, start[1]!]);
@@ -93,7 +90,6 @@ test("a second finger during a box move cancels the move", async ({ page }) => {
   await expect(box).toHaveCount(1);
   const before = (await box.boundingBox())!;
 
-  // Start dragging the box with one finger, then put a second finger down and lift both.
   const c = { x: before.x + before.width / 2, y: before.y + before.height / 2 };
   await touch(cdp, "touchStart", [c]);
   await swipe(cdp, [c], [{ x: c.x + 40, y: c.y + 30 }], 3);
@@ -108,7 +104,6 @@ test("a second finger during a box move cancels the move", async ({ page }) => {
 test("pinching zooms in around the fingers", async ({ page }) => {
   const cdp = await page.context().newCDPSession(page);
   const r = await layerBox(page);
-  // Pinch around a point near the middle of the page, so scrolling can keep it under the fingers.
   const mid = { x: r.x + r.width * 0.5, y: Math.min(r.y + 150, 500) };
   const pageX = (mid.x - r.x) / r.width;
   const pageY = (mid.y - r.y) / r.height;
@@ -123,7 +118,6 @@ test("pinching zooms in around the fingers", async ({ page }) => {
 
   await expect.poll(async () => (await page.getByTestId("page-layer").boundingBox())!.width).toBeGreaterThan(r.width * 2.5);
   const z = (await page.getByTestId("page-layer").boundingBox())!;
-  // The page point that was under the fingers is still (roughly) under them.
   expect(Math.abs(z.x + pageX * z.width - mid.x)).toBeLessThan(30);
   expect(Math.abs(z.y + pageY * z.height - mid.y)).toBeLessThan(30);
   await expect(page.getByTestId("box")).toHaveCount(0);
@@ -162,7 +156,6 @@ test("in Words, taps still redact, including quick taps on different words", asy
 
   await tap("123-45-6789");
   await expect(page.getByTestId("box")).toHaveCount(1);
-  // Two different words in quick succession: neither tap is lost.
   await tap("SSN");
   await tap("Quarterly");
   await expect(page.getByTestId("box")).toHaveCount(3);
@@ -199,7 +192,6 @@ test("the magnifier shows a box under the finger", async ({ page }) => {
   await swipe(cdp, [a], [b]);
   await touch(cdp, "touchEnd", []);
 
-  // Drag the box by its middle: everything around the magnifier's crosshair should be the black box.
   const box = (await page.getByTestId("box").boundingBox())!;
   const mid = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   await touch(cdp, "touchStart", [mid]);

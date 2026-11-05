@@ -1,12 +1,8 @@
-// Word boxes for click-to-redact.
-//
 // The PDF text layer says which words exist and roughly where; the rendered pixels say exactly
 // where. pdf.js reports one start position and width per text run, not per glyph, and on spaced,
 // squeezed or kerned text its positions can drift by several words. So the estimate from the text
 // layer is snapped to the ink on the rendered page (`snapWordsToInk`), and only falls back to the
 // padded estimate when the ink is ambiguous.
-//
-// Pure geometry over plain data, so it also runs under Node.
 import type { PageSize, Rect } from "./types";
 
 export interface Word extends Rect {
@@ -17,13 +13,10 @@ export interface Word extends Rect {
   reversed: boolean;
   /** Baseline position across the reading direction, in page units. */
   base: number;
-  /** Font size in page units. */
   size: number;
-  /** True once the box has been fitted to the rendered ink. */
   snapped: boolean;
 }
 
-/** The parts of pdf.js TextItem / TextStyle this module needs. */
 export interface TextItemLike {
   str: string;
   transform: number[];
@@ -40,7 +33,6 @@ export interface TextStyleLike {
 /** Width of `text` in any unit; only ratios are used. */
 export type Measure = (text: string, fontFamily: string) => number;
 
-/** Fallback when no canvas is available: every character is the same width. */
 export const charCountMeasure: Measure = (text) => text.length;
 
 export interface PixelData {
@@ -68,7 +60,6 @@ function multiply(m: number[], n: number[]): Matrix {
  */
 const SPACED_OUT = /^\S( \S)+$/;
 
-/** Split each text item into words and place them on the page (an estimate; see snapWordsToInk). */
 export function wordsFromText(
   items: TextItemLike[],
   styles: Record<string, TextStyleLike>,
@@ -86,7 +77,6 @@ export function wordsFromText(
     const height = Math.hypot(tx[2], tx[3]);
     const runLength = Math.hypot(tx[0], tx[1]);
     if (!height || !runLength) continue;
-    // Baseline direction and the glyphs' "up" direction, in page (viewport) coordinates.
     const dir = [tx[0] / runLength, tx[1] / runLength] as const;
     const up = [tx[2] / height, tx[3] / height] as const;
     const axis = Math.abs(dir[1]) < 0.01 ? "h" : Math.abs(dir[0]) < 0.01 ? "v" : null;
@@ -138,8 +128,6 @@ export function wordsFromText(
   return words;
 }
 
-// --- Snapping to ink -----------------------------------------------------------------------
-
 /** A pixel is ink when its luminance differs this much from the line's background. */
 const INK_CONTRAST = 60;
 /** How far past the estimated end a line's ink may continue (pdf.js positions drift), in ems. */
@@ -147,7 +135,6 @@ const LINE_REACH_EM = 1.2;
 /** Chosen word gaps must be clearly wider than the widest gap inside a word. */
 const GAP_RATIO = 1.25;
 
-/** Group words into lines: same reading axis and (nearly) the same baseline. */
 export function groupLines(words: Word[]): Word[][] {
   const lines: Word[][] = [];
   for (const w of words) {
@@ -260,7 +247,6 @@ function snapLine(line: Word[], img: PixelData, scale: number): Word[] | null {
 
   const count = line.length;
   if (kept.length < count) return null;
-  // Word breaks are the N-1 widest gaps, and must be clearly wider than any gap inside a word.
   const gaps = kept.slice(1).map((c, i) => ({ after: i, width: c[0] - kept[i]![1] }));
   const byWidth = [...gaps].sort((p, q) => q.width - p.width);
   const breaks = byWidth.slice(0, count - 1);
@@ -297,8 +283,6 @@ function snapLine(line: Word[], img: PixelData, scale: number): Word[] | null {
   });
 }
 
-// --- Selection helpers ---------------------------------------------------------------------
-
 /**
  * The box to burn over a word (or a merged line of words). Snapped boxes already hug the ink, so
  * they get a small margin; estimated ones get more to absorb the estimate's error.
@@ -316,7 +300,6 @@ export function wordAt(words: Word[], x: number, y: number): Word | undefined {
   return words.find((w) => x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h);
 }
 
-/** How much of the shorter of two spans lies in their overlap, from 0 to 1. A zero-length span inside the other counts in full. */
 function spanShare(a: number, aLen: number, b: number, bLen: number): number {
   const overlap = Math.min(a + aLen, b + bLen) - Math.max(a, b);
   if (overlap < 0) return 0;
@@ -333,10 +316,7 @@ export function wordsInRect(words: Word[], r: Rect): Word[] {
   return words.filter((w) => spanShare(w.x, w.w, r.x, r.w) * spanShare(w.y, w.h, r.y, r.h) >= 1 / 3);
 }
 
-/**
- * Merge selected words into one rectangle per line, so the gaps between redacted words are
- * covered too (separate boxes would reveal each word's length).
- */
+/** One rectangle per line: separate boxes would reveal each word's length. */
 export function lineRects(words: Word[]): (Rect & { size: number; snapped: boolean })[] {
   return groupLines(words).map((line) => {
     const x0 = Math.min(...line.map((w) => w.x));

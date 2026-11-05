@@ -1,10 +1,5 @@
-/**
- * Single source of truth for the Content-Security-Policy.
- * Used by the Vite plugin (meta tag + preview header + `_headers` for static hosts)
- * and by the tests.
- */
+/** Single source of truth for the Content-Security-Policy. */
 export interface CspOptions {
-  /** Vite dev server needs inline scripts for React Fast Refresh. */
   dev?: boolean;
   /** Directives that only work as an HTTP header, not in a <meta> tag. */
   header?: boolean;

@@ -13,7 +13,6 @@ import { Thumbnails } from "./Thumbnails";
 
 const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1, 1.25, 1.5, 2, 3, 4];
 const MAX_ZOOM = 6;
-/** Double-tap zooms in to this multiple of the fit-to-width zoom. */
 const DOUBLE_TAP_ZOOM = 2.5;
 
 /** The tip about the two modes shows until dismissed, once per visit. Not saved: the app stores nothing. */
@@ -26,7 +25,6 @@ function isTyping(e: KeyboardEvent): boolean {
 
 interface Props {
   doc: LoadedDoc;
-  /** Phone layout: full-screen page with bars, instead of the desktop toolbar. */
   phone: boolean;
   onDirty: (dirty: boolean) => void;
   onOpenFile: () => void;
@@ -44,14 +42,12 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   const [tool, setTool] = useState<Tool>(doc.kind === "pdf" ? "words" : "draw");
   const autoTool = useRef(doc.kind === "pdf");
   const [tip, setTip] = useState(doc.kind === "pdf" && !tipDismissed);
-  /** The user has found the touch gestures, so the hint about them can go. */
   const [gestured, setGestured] = useState(false);
   const [peek, setPeek] = useState(false);
   const [wordCount, setWordCount] = useState<number | null>(null);
   const [touch] = useState(() => window.matchMedia?.("(pointer: coarse)").matches ?? false);
   const [exporting, setExporting] = useState(false);
   const stageRef = useRef<HTMLDivElement>(null);
-  /** Page point that should stay under a screen point after the next zoom change. */
   const zoomAnchor = useRef<{ px: number; py: number; cx: number; cy: number } | null>(null);
 
   const { scan, start: startScan } = useDetection(doc);
@@ -101,7 +97,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     if (boxes.length > 0 || zoomMode !== "fit") setGestured(true);
   }, [boxes.length, zoomMode, dismissTip]);
 
-  // Fit the page to the available width.
   useEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -117,7 +112,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
 
   const layer = () => stageRef.current?.querySelector<HTMLElement>("[data-testid='page-layer']") ?? null;
 
-  /** Zoom, keeping the page point under (cx, cy) on screen where it is (the stage centre by default). */
   const zoomTo = useCallback(
     (target: number | "fit", cx?: number, cy?: number) => {
       const el = layer();
@@ -135,7 +129,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     [zoom, fitZoom],
   );
 
-  // After the page has been laid out at the new zoom, scroll so the anchor point stays put.
   useLayoutEffect(() => {
     const a = zoomAnchor.current;
     zoomAnchor.current = null;
@@ -177,7 +170,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
   }, [selectedId, history.present, change]);
   const clearPage = () => change(removePageBoxes(boxes, page));
 
-  /** Box focused after the next render (keyboard-created boxes take focus so arrow keys move them). */
   const [focusBox, setFocusBox] = useState<string | null>(null);
   useEffect(() => {
     if (!focusBox) return;
@@ -185,7 +177,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     setFocusBox(null);
   }, [focusBox]);
 
-  /** Keyboard (and menu) way to redact: add a box in the middle of what's on screen. */
   const addBoxInView = useCallback(() => {
     const el = layer();
     const stage = stageRef.current;
@@ -216,7 +207,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     setFocusBox(box.id);
   }, [size, zoom, page, boxes, change]);
 
-  // Keep the selection valid after undo/redo.
   useEffect(() => {
     if (selectedId && !boxes.some((b) => b.id === selectedId)) setSelectedId(null);
   }, [boxes, selectedId]);
@@ -313,7 +303,6 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
     />
   );
 
-  // On the page: what's still up for review, plus whichever finding the user asked to see.
   const marks = reviewOpen
     ? findings
         .filter((f) => f.page === page && (status(f) === "pending" || f.id === focused?.id))

@@ -1,23 +1,17 @@
-// Browser-only pdf.js setup. The legacy build is used for its polyfills (Safari, older Firefox).
+// The legacy build is used for its polyfills (Safari, older Firefox).
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 import workerUrl from "pdfjs-dist/legacy/build/pdf.worker.min.mjs?url";
 
 let port: Worker | null = null;
 
-/**
- * Start the pdf.js worker. Called at startup so the worker script is fetched during the initial
- * page load; after that, opening and exporting files makes no network requests at all.
- */
+/** Started at page load so its script is fetched then; after that the app makes no requests. */
 export function startPdfWorker(): void {
   if (port) return;
   port = new Worker(workerUrl, { type: "module", name: "pdfjs" });
   pdfjs.GlobalWorkerOptions.workerPort = port;
 }
 
-/**
- * Options that keep pdf.js fully offline: no CMap, standard-font or wasm URLs, so it never
- * fetches anything. Fonts that aren't embedded fall back to system fonts.
- */
+/** No CMap, standard-font or wasm URLs, so pdf.js never fetches anything. */
 export const OFFLINE_DOC_OPTIONS = {
   useSystemFonts: true,
   useWasm: false,

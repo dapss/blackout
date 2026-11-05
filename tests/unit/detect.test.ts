@@ -5,7 +5,6 @@ import type { Word } from "../../src/core/words";
 import { DETECTORS, PACKS } from "../../src/packs";
 import { isCardNumber, isIban, isNik, luhn } from "../../src/packs/validators";
 
-/** What was found in a line of text: [detector id, matched text]. */
 const found = (text: string) => findMatches(text).map((m) => [m.detector.id, text.slice(m.start, m.end)]);
 const nothing = (text: string) => expect(found(text), text).toEqual([]);
 const finds = (id: string, value: string, text = value) => expect(found(text), text).toEqual([[id, value]]);

@@ -15,7 +15,6 @@ type State =
 interface Props {
   doc: LoadedDoc;
   boxes: Box[];
-  /** Found items the user hasn't accepted or rejected yet. */
   unreviewed: number;
   onClose: () => void;
 }

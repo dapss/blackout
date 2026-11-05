@@ -62,12 +62,10 @@ const verifiedLine = (boxes: number) =>
     ? "Verified: file cleaned, no boxes to check"
     : `Verified: nothing under your ${boxes === 1 ? "box" : `${boxes} boxes`} can be recovered`;
 
-/** Export, wait for the check, download, and return the file's bytes and name. */
 export async function exportAndDownload(page: Page, boxes: number) {
   await page.getByTestId("export-button").click();
   const summary = page.getByTestId("verify-summary");
   await expect(summary).toBeVisible({ timeout: 120_000 });
-  // On failure, show which checks failed.
   const checks = await page.getByTestId("verify-checks").innerText();
   expect(await summary.innerText(), checks).toBe(verifiedLine(boxes));
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByTestId("download").click()]);

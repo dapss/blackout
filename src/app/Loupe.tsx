@@ -3,7 +3,6 @@ import { type RefObject, useLayoutEffect, useRef } from "react";
 import { LOUPE_SIZE, loupeSpot } from "../core/geometry";
 import type { PageSize, Rect } from "../core/types";
 
-/** How much bigger than the page on screen. */
 const MAGNIFY = 2.5;
 
 interface Props {
@@ -11,12 +10,9 @@ interface Props {
   size: PageSize;
   zoom: number;
   peek: boolean;
-  /** The finger, on screen and in page units. */
   finger: { cx: number; cy: number; px: number; py: number };
   boxes: Rect[];
-  /** The box being drawn, outlined. */
   active: Rect | null;
-  /** Words a drag across text would take, highlighted. */
   highlights: Rect[];
 }
 
@@ -33,7 +29,6 @@ export function Loupe({ source, size, zoom, peek, finger, boxes, active, highlig
     ctx.fillStyle = "#808080"; // off the page's edge
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Draw in page units, with the finger's point in the middle.
     const scale = zoom * MAGNIFY * dpr;
     const middle = (LOUPE_SIZE * dpr) / 2;
     ctx.setTransform(scale, 0, 0, scale, middle - finger.px * scale, middle - finger.py * scale);

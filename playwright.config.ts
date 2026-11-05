@@ -16,7 +16,6 @@ export default defineConfig({
     acceptDownloads: true,
     trace: "retain-on-failure",
   },
-  // End-to-end tests run against the production build, which is what users get.
   webServer: {
     command: `pnpm build && pnpm preview --port ${PORT} --strictPort`,
     url: `http://localhost:${PORT}`,

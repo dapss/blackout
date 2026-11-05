@@ -1,4 +1,3 @@
-// Detection: scans the document's text on request, and lists what it found for the user to review.
 // Accepted findings become ordinary boxes; nothing is blacked out without the user's say-so.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Finding, findingsOnPage } from "../core/detect";

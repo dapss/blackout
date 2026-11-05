@@ -105,7 +105,7 @@ button:active:not(:disabled) {
   z-index: 50;
 }
 
-/* --- Top bar and privacy banner --- */
+/* Top bar and privacy banner */
 
 .topbar {
   display: flex;
@@ -208,7 +208,7 @@ button:active:not(:disabled) {
   min-height: 0;
 }
 
-/* --- Empty state --- */
+/* Empty state */
 
 .dropzone {
   margin: auto;
@@ -236,7 +236,7 @@ button:active:not(:disabled) {
   font-size: 0.88rem;
 }
 
-/* --- Buttons --- */
+/* Buttons */
 
 .btn {
   display: inline-flex;
@@ -293,7 +293,7 @@ button:active:not(:disabled) {
   min-width: 58px;
 }
 
-/* --- Editor layout --- */
+/* Editor layout */
 
 .editor {
   flex: 1;
@@ -687,7 +687,7 @@ button:active:not(:disabled) {
   width: auto;
 }
 
-/* --- Page and boxes --- */
+/* Page and boxes */
 
 .page {
   position: relative;
@@ -827,7 +827,7 @@ button:active:not(:disabled) {
 .h-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .h-w { left: 0; top: 50%; cursor: ew-resize; }
 
-/* --- Export dialog --- */
+/* Export dialog */
 
 .overlay {
   position: fixed;
@@ -946,7 +946,7 @@ button:active:not(:disabled) {
   min-height: 40px;
 }
 
-/* --- Footer --- */
+/* Footer */
 
 .footer {
   display: flex;
@@ -972,7 +972,7 @@ button:active:not(:disabled) {
   font-weight: 600;
 }
 
-/* --- Phone width --- */
+/* Phone width */
 
 @media (max-width: 720px) {
   .editor.has-thumbs {
@@ -1015,7 +1015,7 @@ button:active:not(:disabled) {
   }
 }
 
-/* --- Words tool --- */
+/* Words tool */
 
 .layer.tool-words {
   cursor: text;
@@ -1059,7 +1059,7 @@ button:active:not(:disabled) {
   cursor: not-allowed;
 }
 
-/* --- Phone editor (screens up to 720px; see PHONE_QUERY in scroll.ts) --- */
+/* Phone editor (screens up to 720px; see PHONE_QUERY in scroll.ts) */
 
 .app.phone-editing {
   height: 100dvh;

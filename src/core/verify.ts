@@ -1,5 +1,4 @@
-// Re-open an export and prove the redaction held.
-// Everything that needs a browser (rasterizing) is injected, so the checks also run under Node.
+// Re-opens an export and proves the redaction held. Browser-only steps are injected, so this also runs under Node.
 import { PDFDict, PDFDocument, PDFName, PDFStream } from "pdf-lib";
 import type * as PdfjsNs from "pdfjs-dist/legacy/build/pdf.mjs";
 import { innerPixelRect } from "./geometry";
@@ -19,7 +18,6 @@ export interface VerifyReport {
   ok: boolean;
   checks: Check[];
   boxesTotal: number;
-  /** Boxes whose content could still be read from the output. */
   boxesRecoverable: number;
   textItems: number;
 }
@@ -30,16 +28,13 @@ export interface PixelData {
   height: number;
 }
 
-/** Render a page of the output PDF to pixels at `scale` (browser: canvas; tests: anything). */
 export type PdfRasterizer = (page: PdfPage, scale: number) => Promise<PixelData>;
 export type PngRasterizer = (bytes: Uint8Array) => Promise<PixelData>;
 
-/** Scale the output is re-rendered at for the pixel check (144 DPI). */
+/** 144 DPI. */
 export const VERIFY_SCALE = 2;
 /** A pixel inside a box counts as black up to this luminance (0-255); leaves room for JPEG noise. */
 export const MAX_BOX_LUMINANCE = 96;
-
-// --- PDF structure (pdf-lib) ---------------------------------------------------------------
 
 const FORBIDDEN: Record<string, { keys: string[]; types: string[] }> = {
   "no-metadata": { keys: ["Metadata", "PieceInfo", "Info"], types: ["Metadata"] },
@@ -64,7 +59,6 @@ function nameOf(dict: PDFDict, key: string): string | undefined {
   return v instanceof PDFName ? v.decodeText() : undefined;
 }
 
-/** Count an ASCII needle in raw bytes, using the engine's native string search. */
 function countOccurrences(bytes: Uint8Array, needle: string): number {
   // latin1 maps every byte to one character, so offsets and ASCII matches are preserved.
   const text = new TextDecoder("latin1").decode(bytes);
@@ -137,14 +131,11 @@ export async function inspectPdfStructure(bytes: Uint8Array, expectedPages: numb
   return findings;
 }
 
-// --- Pixels --------------------------------------------------------------------------------
-
 export function luminanceAt(px: PixelData, x: number, y: number): number {
   const i = (y * px.width + x) * 4;
   return 0.299 * px.data[i]! + 0.587 * px.data[i + 1]! + 0.114 * px.data[i + 2]!;
 }
 
-/** True when every pixel inside the box (minus a 1px anti-aliasing margin) is black. */
 export function isBoxBlack(px: PixelData, box: Rect, scale: number): boolean {
   const r = innerPixelRect(box, scale, 1, px.width, px.height);
   for (let y = r.y; y < r.y + r.h; y++) {
@@ -152,8 +143,6 @@ export function isBoxBlack(px: PixelData, box: Rect, scale: number): boolean {
   }
   return true;
 }
-
-// --- PNG -----------------------------------------------------------------------------------
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 /** Chunks a re-encoded canvas image may contain. eXIf, tEXt, zTXt, iTXt and tIME are rejected. */
@@ -190,22 +179,17 @@ export function inspectPng(bytes: Uint8Array): PngInfo {
   return info;
 }
 
-// --- Orchestration -------------------------------------------------------------------------
-
 export interface VerifyInput {
   kind: DocKind;
   bytes: Uint8Array;
   boxes: Box[];
   pageCount: number;
-  /** Pixels per page unit used at export (only needed for images). */
   scales: number[];
 }
 
 export interface VerifyDeps {
   pdfjs?: PdfjsLib;
-  /** Run the structural check elsewhere (the browser uses the export worker to keep the UI free). */
   inspectStructure?: typeof inspectPdfStructure;
-  /** Extra pdf.js getDocument options (offline settings in the browser). */
   pdfjsOptions?: Record<string, unknown>;
   rasterizePdfPage?: PdfRasterizer;
   rasterizePng?: PngRasterizer;
