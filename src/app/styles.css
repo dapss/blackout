@@ -599,10 +599,24 @@ button:active:not(:disabled) {
 
 .editor.phone .review {
   position: static;
+  align-self: stretch;
   flex: 0 0 auto;
   max-height: 42vh;
   border-top: 1px solid var(--line);
   border-left: 0;
+}
+
+.review-step {
+  padding-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.editor.phone .review-step .btn {
+  min-height: 44px;
 }
 
 .editor.phone .finding-actions .btn {
@@ -913,11 +927,17 @@ button:active:not(:disabled) {
   color: var(--fail);
 }
 
+/* Stays in reach when a long result scrolls on a small screen. */
 .dialog-actions {
+  position: sticky;
+  bottom: -24px;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  margin: 0 -24px -24px;
+  padding: 12px 24px 24px;
+  background: var(--surface);
 }
 
 .dialog-actions .btn {

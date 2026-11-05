@@ -6,6 +6,19 @@ shows which version you are using.
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor versions (0.2, 0.3)
 bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and polish.
 
+## 0.2.1 (2026-11-05)
+
+### Fixed
+- Find items now follows a value that wraps onto the next line. Before, a phone number split by a
+  line break could be listed and blacked out only in part, leaving its last digits readable, and a
+  split card number or IBAN could be missed.
+
+### Changed
+- The export check says what it actually checked: nothing under your boxes can be recovered. It also
+  reminds you that it can't tell whether something sensitive was left uncovered.
+- On phones, tapping a found item shrinks the panel so you can see that spot on the page, with Next
+  to step through the items one by one.
+
 ## 0.2.0 (2026-11-05)
 
 ### Added

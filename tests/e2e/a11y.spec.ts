@@ -61,7 +61,7 @@ test.describe("desktop keyboard", () => {
     // Export, and keyboard focus stays inside the dialog until it closes.
     await tabTo(page, (el) => el.testid === "export-button", true);
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("verify-summary")).toContainText("Verified: 0 of 1", { timeout: 120_000 });
+    await expect(page.getByTestId("verify-summary")).toContainText("nothing under your box", { timeout: 120_000 });
     for (let i = 0; i < 12; i++) {
       await page.keyboard.press("Tab");
       expect(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]"))).toBe(true);

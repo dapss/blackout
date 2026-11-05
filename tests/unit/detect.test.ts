@@ -220,8 +220,110 @@ describe("findingsOnPage", () => {
     expect(f!.text).toBe("jane@example.com");
   });
 
-  it("doesn't find a value split across two lines", () => {
-    expect(findingsOnPage([word("4111", 10, 100), word("1111", 40, 100), word("1111", 10, 120), word("1111", 40, 120)], 0, page)).toEqual([]);
+  describe("a value that wraps onto the next line", () => {
+    const texts = (list: { text: string }[]) => list.map((f) => f.text);
+
+    it("finds it whole, with a box on each line and nothing else boxed", () => {
+      const list = findingsOnPage(
+        [word("ke", 10, 100), word("+62", 40, 100), word("21", 70, 100), word("5555", 90, 100), word("0199", 10, 117), word("apabila", 50, 117)],
+        0,
+        page,
+      );
+      expect(list).toHaveLength(1);
+      expect(list[0]).toMatchObject({ detectorId: "intl.phone", text: "+62 21 5555 0199" });
+      expect(list[0]!.rects).toHaveLength(2);
+      const [first, second] = list[0]!.rects;
+      expect(first!.x).toBeGreaterThan(30);
+      expect(first!.x + first!.w).toBeGreaterThanOrEqual(114);
+      expect(second!.x).toBeLessThanOrEqual(10);
+      expect(second!.x + second!.w).toBeLessThan(50);
+    });
+
+    it.each([
+      ["a card", ["4111 1111", "1111 1111"], "intl.card", "4111 1111 1111 1111"],
+      ["an IBAN", ["DE89 3704 0044", "0532 0130 00"], "eu.iban", "DE89 3704 0044 0532 0130 00"],
+      ["a NIK cut in the middle", ["32010145", "12900001"], "id.nik", "32010145 12900001"],
+      ["a card over four lines of a narrow cell", ["4111", "1111", "1111", "1111"], "intl.card", "4111 1111 1111 1111"],
+      ["a phone number broken at a hyphen", ["0812-3456-", "7890"], "intl.phone", "0812-3456-7890"],
+      ["an NPWP broken at a hyphen", ["01.234.567.8-", "901.234"], "id.npwp", "01.234.567.8-901.234"],
+      ["an email broken at a hyphen", ["budi-", "santoso@example.com"], "intl.email", "budi-santoso@example.com"],
+      ["an email broken after the @", ["budi@", "example.com"], "intl.email", "budi@example.com"],
+    ])("%s", (_what, parts, detector, value) => {
+      const pieces = parts.flatMap((part, i) => {
+        let x = 10;
+        return part.split(" ").map((t) => {
+          const w = word(t, x, 100 + i * 17);
+          x += w.w + 6;
+          return w;
+        });
+      });
+      const list = findingsOnPage(pieces, 0, page);
+      expect(list.map((f) => [f.detectorId, f.text])).toEqual([[detector, value]]);
+      expect(list[0]!.rects).toHaveLength(parts.length);
+    });
+
+    it("finds it on rotated pages, where the next line lies in another direction", () => {
+      const turned = (text: string, base: number, y: number, reversed: boolean): Word => ({
+        ...word(text, base - 10, y),
+        w: 12,
+        h: text.length * 6,
+        axis: "v",
+        reversed,
+        base,
+      });
+      const clockwise = [turned("4111", 300, 10, false), turned("1111", 300, 40, false), turned("1111", 283, 10, false), turned("1111", 283, 40, false)];
+      expect(texts(findingsOnPage(clockwise, 0, page))).toEqual(["4111 1111 1111 1111"]);
+      const anti = [turned("4111", 300, 300, true), turned("1111", 300, 270, true), turned("1111", 317, 300, true), turned("1111", 317, 270, true)];
+      expect(texts(findingsOnPage(anti, 0, page))).toEqual(["4111 1111 1111 1111"]);
+    });
+
+    it("keeps each row of a table as its own finding", () => {
+      const rows = ["021 555 0199", "021 555 0200"].flatMap((row, i) => {
+        let x = 10;
+        return row.split(" ").map((t) => {
+          const w = word(t, x, 100 + i * 17);
+          x += w.w + 6;
+          return w;
+        });
+      });
+      expect(texts(findingsOnPage(rows, 0, page))).toEqual(["021 555 0199", "021 555 0200"]);
+    });
+
+    it("follows the column the value is in, not the row's other cells", () => {
+      const list = findingsOnPage(
+        [word("Kartu", 10, 100), word("4111", 200, 100), word("1111", 240, 100), word("Rp", 400, 100), word("1111", 200, 117), word("1111", 240, 117), word("9000", 400, 117)],
+        0,
+        page,
+      );
+      expect(texts(list)).toEqual(["4111 1111 1111 1111"]);
+      expect(list[0]!.rects).toHaveLength(2);
+    });
+
+    it.each([
+      ["too far below", [word("4111", 10, 100), word("1111", 40, 100), word("1111", 10, 140), word("1111", 40, 140)]],
+      ["off to the side", [word("4111", 10, 100), word("1111", 40, 100), word("1111", 300, 117), word("1111", 330, 117)]],
+      ["above, not below", [word("1111", 10, 83), word("1111", 40, 83), word("4111", 10, 100), word("1111", 40, 100)]],
+      ["in much smaller print", [word("4111", 10, 100), word("1111", 40, 100), { ...word("1111", 10, 117), size: 6 }, { ...word("1111", 40, 117), size: 6 }]],
+    ])("doesn't join lines that are %s", (_why, pieces) => {
+      expect(findingsOnPage(pieces, 0, page)).toEqual([]);
+    });
+
+    it("keeps findings in reading order with unique ids", () => {
+      const list = findingsOnPage(
+        [word("a@example.com", 10, 60), word("4111", 10, 100), word("1111", 40, 100), word("1111", 10, 117), word("1111", 40, 117), word("b@example.com", 10, 160)],
+        0,
+        page,
+      );
+      expect(texts(list)).toEqual(["a@example.com", "4111 1111 1111 1111", "b@example.com"]);
+      expect(new Set(list.map((f) => f.id)).size).toBe(3);
+    });
+
+    it("counts as covered only when every line is covered", () => {
+      const [f] = findingsOnPage([word("4111", 10, 100), word("1111", 40, 100), word("1111", 10, 117), word("1111", 40, 117)], 1, page);
+      const [first, second] = f!.rects;
+      expect(isCovered(f!, [{ ...first!, page: 1 }])).toBe(false);
+      expect(isCovered(f!, [{ ...first!, page: 1 }, { ...second!, page: 1 }])).toBe(true);
+    });
   });
 
   it("gives every finding its own id, and returns nothing for a page with no words", () => {

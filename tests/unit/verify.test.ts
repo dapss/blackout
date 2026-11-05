@@ -119,7 +119,7 @@ describe("verifyExport (PDF)", () => {
     expect(report.checks.filter((c) => !c.ok)).toEqual([]);
     expect(report.ok).toBe(true);
     expect(report.textItems).toBe(0);
-    expect(summaryLine(report)).toBe("Verified: 0 of 1 redacted item recoverable");
+    expect(summaryLine(report)).toBe("Verified: nothing under your box can be recovered");
   });
 
   it("fails and counts the box when the pixels under it are not black", async () => {

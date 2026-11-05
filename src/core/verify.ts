@@ -336,7 +336,8 @@ function summarize(
 
 export function summaryLine(r: VerifyReport): string {
   const n = r.boxesTotal;
+  if (r.ok && n === 0) return "Verified: file cleaned, no boxes to check";
   return r.ok
-    ? `Verified: 0 of ${n} redacted item${n === 1 ? "" : "s"} recoverable`
+    ? `Verified: nothing under your ${n === 1 ? "box" : `${n} boxes`} can be recovered`
     : `Check failed: ${r.checks.filter((c) => !c.ok).length} problem(s) found. Download blocked.`;
 }

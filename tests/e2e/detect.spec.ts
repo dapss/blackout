@@ -62,6 +62,36 @@ test("finds each type on the pages it's on, and not the look-alikes, with no net
   expect(requests).toEqual([]);
 });
 
+test("a phone number that wraps is blacked out on both lines, and the export is clean", async ({ page }) => {
+  const doc = await PDFDocument.create();
+  const p = doc.addPage([400, 300]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  p.drawText("Please call the office on +62 21 5555", { x: 40, y: 220, size: 14, font });
+  p.drawText("0199 if it is urgent.", { x: 40, y: 200, size: 14, font });
+  await page.goto("/");
+  await openBuffer(page, "wrapped.pdf", "application/pdf", Buffer.from(await doc.save()));
+  await find(page);
+
+  const row = finding(page, "intl.phone");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("+62 21 5555 0199");
+  await page.getByRole("button", { name: /Redact all/ }).click();
+  await expect(row).toContainText("Blacked out");
+
+  await expect(page.getByTestId("box")).toHaveCount(2);
+  const [first, second] = await page.getByTestId("box").evaluateAll((els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { top: r.top, left: r.left };
+    }),
+  );
+  expect(second!.top).toBeGreaterThan(first!.top);
+  expect(second!.left).toBeLessThan(first!.left);
+
+  const { bytes } = await exportAndDownload(page, 2);
+  expect((await pdfTextItems(bytes)).items).toBe(0);
+});
+
 test("the wording doesn't promise it found everything", async ({ page }) => {
   await openDetect(page);
   const summary = page.getByTestId("review-summary");
@@ -157,12 +187,52 @@ test("showing a finding goes to its page", async ({ page }) => {
   await expect(page.locator(".finding-mark.active")).toBeVisible();
 });
 
+test.describe("reviewing on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 }, hasTouch: true });
+
+  test("tapping a finding shrinks the panel so the page shows, and Next steps through", async ({ page }) => {
+    await openDetect(page);
+    const stage = page.locator(".stage");
+    const roomInList = (await stage.boundingBox())!.height;
+    await expect(page.getByTestId("review-tap-hint")).toBeVisible();
+
+    await finding(page, "intl.email").getByRole("button", { name: /Email/ }).click();
+    await expect(page.getByTestId("finding")).toHaveCount(1);
+    await expect(page.getByTestId("review-position")).toHaveText("1 of 6");
+    expect((await stage.boundingBox())!.height).toBeGreaterThan(roomInList * 1.3);
+    const panel = (await page.getByTestId("review-panel").boundingBox())!;
+    expect(panel.width).toBe(page.viewportSize()!.width);
+    await expect(page.locator(".finding-mark.active")).toBeInViewport({ ratio: 1 });
+
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(finding(page, "intl.phone")).toHaveCount(1);
+    await expect(page.getByTestId("review-position")).toHaveText("2 of 6");
+    await action(finding(page, "intl.phone"), "Accept").click();
+    await expect(finding(page, "intl.phone")).toContainText("Blacked out");
+    await expect(page.getByTestId("box")).toHaveCount(1);
+
+    await page.getByRole("button", { name: "All items", exact: true }).click();
+    await expect(page.getByTestId("finding")).toHaveCount(6);
+    await expect(page.getByRole("button", { name: /Redact all/ })).toBeVisible();
+    await expect(page.getByTestId("review-panel")).toBeFocused();
+  });
+});
+
+test("the desktop panel keeps the whole list when a finding is shown", async ({ page, isMobile }) => {
+  test.skip(!!isMobile, "desktop layout");
+  await openDetect(page);
+  await finding(page, "intl.email").getByRole("button", { name: /Email/ }).click();
+  await expect(page.getByTestId("finding")).toHaveCount(6);
+  await expect(page.getByTestId("review-position")).toHaveCount(0);
+});
+
 test("exporting warns about findings nobody has reviewed, without blocking the download", async ({ page }) => {
   await openDetect(page);
   await action(finding(page, "intl.email"), "Accept").click();
   await action(finding(page, "intl.phone"), "Reject").click();
   await page.getByTestId("export-button").click();
-  await expect(page.getByTestId("verify-summary")).toContainText("Verified: 0 of 1", { timeout: 120_000 });
+  await expect(page.getByTestId("verify-summary")).toContainText("nothing under your box", { timeout: 120_000 });
+  await expect(page.getByTestId("verify-scope")).toContainText("left uncovered");
   await expect(page.getByTestId("export-unreviewed")).toHaveText("4 found items haven’t been reviewed, so they aren’t blacked out in this file.");
   await expect(page.getByTestId("download")).toBeEnabled();
 });

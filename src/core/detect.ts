@@ -1,5 +1,6 @@
-// Finds sensitive values in a page's text. Works on the same words as the Words tool, line by line,
-// so a value split across two lines isn't found. Pure code over plain data, so it also runs under Node.
+// Finds sensitive values in a page's text. Works on the same words as the Words tool: line by line,
+// then again across lines that wrap, so a value split in two is covered whole rather than in part.
+// Pure code over plain data, so it also runs under Node.
 import { DETECTORS } from "../packs";
 import type { Detector } from "../packs/types";
 import { validators } from "../packs/validators";
@@ -24,6 +25,13 @@ export interface Finding {
 
 /** Words closer than this (in font sizes) are one run of text that the PDF happened to split. */
 const WORD_GAP_EM = 0.15;
+/** Words further apart than this (in font sizes) are in different columns of the same row. */
+const COLUMN_GAP_EM = 2.5;
+/** The furthest apart two lines of one paragraph can be, baseline to baseline, in font sizes. */
+const MAX_LINE_STEP_EM = 2.4;
+const MIN_LINE_STEP_EM = 0.6;
+/** Line breaks here need no space when the lines are joined back together. */
+const BREAKS_WITHOUT_SPACE = /[\-‐-―@]$/;
 
 const LETTER_OR_DIGIT = /[\p{L}\p{N}]/u;
 const GROUP_SEPARATOR = /[ \-‐-―]/;
@@ -101,20 +109,23 @@ export function findMatches(text: string, detectors: Detector[] = DETECTORS): Te
   return matches.sort((a, b) => a.start - b.start);
 }
 
+const along = (w: Word) => (w.axis === "v" ? w.y : w.x);
+const lengthOf = (w: Word) => (w.axis === "v" ? w.h : w.w);
+const inReadingOrder = (line: Word[]) =>
+  [...line].sort((a, b) => (line[0]!.reversed ? along(b) - along(a) : along(a) - along(b)));
+/** Space between two neighbouring words, in reading order. */
+const gapBetween = (prev: Word, w: Word) =>
+  prev.reversed ? along(prev) - (along(w) + lengthOf(w)) : along(w) - (along(prev) + lengthOf(prev));
+
 /** A line's words in reading order, as text, with which word each character came from. */
 export function lineText(line: Word[]): { text: string; wordAt: number[]; words: Word[] } {
-  const first = line[0]!;
-  const vertical = first.axis === "v";
-  const from = (w: Word) => (vertical ? w.y : w.x);
-  const length = (w: Word) => (vertical ? w.h : w.w);
-  const words = [...line].sort((a, b) => (first.reversed ? from(b) - from(a) : from(a) - from(b)));
+  const words = inReadingOrder(line);
   let text = "";
   const wordAt: number[] = [];
   words.forEach((w, i) => {
     const prev = words[i - 1];
     if (prev) {
-      const gap = first.reversed ? from(prev) - (from(w) + length(w)) : from(w) - (from(prev) + length(prev));
-      if (gap >= WORD_GAP_EM * Math.min(w.size, prev.size)) {
+      if (gapBetween(prev, w) >= WORD_GAP_EM * Math.min(w.size, prev.size)) {
         text += " ";
         wordAt.push(-1);
       }
@@ -125,27 +136,136 @@ export function lineText(line: Word[]): { text: string; wordAt: number[]; words:
   return { text, wordAt, words };
 }
 
-/** Findings on one page. A box covers each whole word a match touches, so nothing is left half-covered. */
-export function findingsOnPage(words: Word[], page: number, size: PageSize, detectors: Detector[] = DETECTORS): Finding[] {
-  const lines = groupLines(words)
-    .map(lineText)
-    .sort((a, b) => Math.min(...a.words.map((w) => w.y)) - Math.min(...b.words.map((w) => w.y)));
-  const findings: Finding[] = [];
-  for (const line of lines) {
-    for (const match of findMatches(line.text, detectors)) {
-      const touched = new Set(line.wordAt.slice(match.start, match.end).filter((i) => i >= 0));
-      const covered = [...touched].map((i) => line.words[i]!);
-      findings.push({
-        id: `${page}-${findings.length}`,
-        page,
-        detectorId: match.detector.id,
-        label: match.detector.label,
-        text: line.text.slice(match.start, match.end),
-        rects: lineRects(covered).map((r) => wordBox(r, size)),
-      });
+/** The parts of a line in separate columns, as in a table row or a two-column page. */
+function columnsOf(line: Word[]): Word[][] {
+  const columns: Word[][] = [];
+  inReadingOrder(line).forEach((w, i, words) => {
+    const prev = words[i - 1];
+    if (prev && gapBetween(prev, w) < COLUMN_GAP_EM * Math.min(w.size, prev.size)) columns[columns.length - 1]!.push(w);
+    else columns.push([w]);
+  });
+  return columns;
+}
+
+/** Which way the next line lies across the reading direction: rotated pages read in other directions. */
+const nextLineDirection = (w: Word) => ((w.axis === "h") === w.reversed ? -1 : 1);
+
+/** How far along the line two pieces of text overlap, in page units. */
+function overlap(a: Word[], b: Word[]): number {
+  const start = (l: Word[]) => Math.min(...l.map(along));
+  const end = (l: Word[]) => Math.max(...l.map((w) => along(w) + lengthOf(w)));
+  return Math.min(end(a), end(b)) - Math.max(start(a), start(b));
+}
+
+/** Could `b` be where the text of `a` carries on after a line break? */
+function carriesOn(a: Word[], b: Word[]): boolean {
+  const x = a[0]!;
+  const y = b[0]!;
+  if (x.axis !== y.axis || x.reversed !== y.reversed) return false;
+  if (Math.min(x.size, y.size) / Math.max(x.size, y.size) < 0.8) return false;
+  const step = (y.base - x.base) * nextLineDirection(x);
+  return step >= MIN_LINE_STEP_EM * x.size && step <= MAX_LINE_STEP_EM * x.size && overlap(a, b) > 0;
+}
+
+/** Follows each piece of text to the line that carries it on, giving one list of lines per paragraph. */
+function paragraphs(lines: Word[][]): Word[][][] {
+  const pieces = lines
+    .filter((l) => l[0]!.axis)
+    .flatMap(columnsOf)
+    .sort((a, b) => (a[0]!.base - b[0]!.base) * nextLineDirection(a[0]!));
+  const next = new Map<Word[], Word[]>();
+  const taken = new Set<Word[]>();
+  for (const a of pieces) {
+    const best = pieces
+      .filter((b) => !taken.has(b) && carriesOn(a, b))
+      .sort((p, q) => (p[0]!.base - q[0]!.base) * nextLineDirection(a[0]!) || overlap(a, q) - overlap(a, p))[0];
+    if (best) {
+      next.set(a, best);
+      taken.add(best);
     }
   }
-  return findings;
+  return pieces
+    .filter((p) => !taken.has(p) && next.has(p))
+    .map((head) => {
+      const chain = [head];
+      for (let p = next.get(head); p; p = next.get(p)) chain.push(p);
+      return chain;
+    });
+}
+
+interface Hit {
+  detector: Detector;
+  text: string;
+  /** The whole words the match touches, in reading order. */
+  words: Word[];
+}
+
+/** Matches that only exist once a paragraph's lines are put back together. */
+function wrappedHits(lines: Word[][], detectors: Detector[]): Hit[] {
+  const hits: Hit[] = [];
+  for (const chain of paragraphs(lines)) {
+    let text = "";
+    const wordAt: number[] = [];
+    const words: Word[] = [];
+    const lineOf = new Map<Word, number>();
+    chain.forEach((piece, i) => {
+      const line = lineText(piece);
+      if (i > 0 && !BREAKS_WITHOUT_SPACE.test(text)) {
+        text += " ";
+        wordAt.push(-1);
+      }
+      text += line.text;
+      for (const at of line.wordAt) wordAt.push(at < 0 ? -1 : at + words.length);
+      for (const w of line.words) lineOf.set(w, i);
+      words.push(...line.words);
+    });
+    for (const match of findMatches(text, detectors)) {
+      const touched = [...new Set(wordAt.slice(match.start, match.end).filter((i) => i >= 0))].map((i) => words[i]!);
+      if (new Set(touched.map((w) => lineOf.get(w))).size > 1) {
+        hits.push({ detector: match.detector, text: text.slice(match.start, match.end), words: touched });
+      }
+    }
+  }
+  return hits;
+}
+
+/**
+ * Findings on one page. A box covers each whole word a match touches, so nothing is left half-covered.
+ * A value that wraps replaces the piece of it found on the first line, which could look complete: the
+ * start of a phone number is a valid phone number. It doesn't take text from a separate value, so one
+ * table row running into the next stays as two findings.
+ */
+export function findingsOnPage(words: Word[], page: number, size: PageSize, detectors: Detector[] = DETECTORS): Finding[] {
+  const lines = groupLines(words)
+    .map((l) => lineText(l).words)
+    .sort((a, b) => Math.min(...a.map((w) => w.y)) - Math.min(...b.map((w) => w.y)));
+  let hits: Hit[] = lines.flatMap((l) => {
+    const line = lineText(l);
+    return findMatches(line.text, detectors).map((match) => ({
+      detector: match.detector,
+      text: line.text.slice(match.start, match.end),
+      words: [...new Set(line.wordAt.slice(match.start, match.end).filter((i) => i >= 0))].map((i) => line.words[i]!),
+    }));
+  });
+  for (const wrapped of wrappedHits(lines, detectors)) {
+    const inside = new Set(wrapped.words);
+    const touching = hits.filter((h) => h.words.some((w) => inside.has(w)));
+    if (touching.length > 1 || touching.some((h) => !h.words.every((w) => inside.has(w)))) continue;
+    hits = [...hits.filter((h) => !touching.includes(h)), wrapped];
+  }
+
+  const position = new Map(lines.flatMap((l, i) => l.map((w, j): [Word, number] => [w, i * 1e6 + j])));
+  const at = (h: Hit) => position.get(h.words[0]!)!;
+  return hits
+    .sort((a, b) => at(a) - at(b))
+    .map((h, i) => ({
+      id: `${page}-${i}`,
+      page,
+      detectorId: h.detector.id,
+      label: h.detector.label,
+      text: h.text,
+      rects: lineRects(h.words).map((r) => wordBox(r, size)),
+    }));
 }
 
 /** A box covers a finding only if each of its rectangles lies fully inside one box. */

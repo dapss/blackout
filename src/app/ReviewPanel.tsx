@@ -60,6 +60,7 @@ interface Props {
   scan: Scan;
   status: (f: Finding) => FindingStatus;
   totalPages: number;
+  phone: boolean;
   focusedId: string | null;
   onShow: (f: Finding) => void;
   onAccept: (f: Finding) => void;
@@ -74,6 +75,7 @@ export function ReviewPanel({
   scan,
   status,
   totalPages,
+  phone,
   focusedId,
   onShow,
   onAccept,
@@ -85,23 +87,57 @@ export function ReviewPanel({
 }: Props) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => ref.current?.focus(), []);
+  // A phone has no room for the page and the list at once, so looking at one finding shrinks the panel to it.
+  const [oneAtATime, setOneAtATime] = useState(false);
 
   const findings = scan.state === "done" ? scan.findings : [];
   const noText = scan.state === "done" ? scan.noText : [];
   const pending = findings.filter((f) => status(f) === "pending");
   const noTextAtAll = noText.length === totalPages;
   const count = `${findings.length} item${findings.length === 1 ? "" : "s"}`;
+  const focusedAt = findings.findIndex((f) => f.id === focusedId);
+  const single = phone && oneAtATime && focusedAt >= 0;
+  const show = (f: Finding) => {
+    if (phone) setOneAtATime(true);
+    onShow(f);
+  };
 
   return (
     <aside className="review" role="region" aria-label="Review findings" tabIndex={-1} ref={ref} data-testid="review-panel">
-      <div className="review-head">
-        <h2>Find items</h2>
-        <button type="button" className="btn" onClick={onClose}>
-          Close
-        </button>
-      </div>
+      {!single && (
+        <div className="review-head">
+          <h2>Find items</h2>
+          <button type="button" className="btn" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      )}
 
-      {scan.state !== "done" ? (
+      {single ? (
+        <div className="review-step">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              setOneAtATime(false);
+              ref.current?.focus();
+            }}
+          >
+            All items
+          </button>
+          <span data-testid="review-position">
+            {focusedAt + 1} of {findings.length}
+          </span>
+          <button
+            type="button"
+            className="btn"
+            disabled={findings.length < 2}
+            onClick={() => show(findings[(focusedAt + 1) % findings.length]!)}
+          >
+            Next
+          </button>
+        </div>
+      ) : scan.state !== "done" ? (
         <p role="status" data-testid="review-progress">
           {scan.state === "scanning" ? `Looking through page ${scan.page + 1} of ${scan.total}…` : "Starting…"}
         </p>
@@ -123,7 +159,7 @@ export function ReviewPanel({
         </div>
       )}
 
-      {noText.length > 0 && (
+      {!single && noText.length > 0 && (
         <p className="review-notext" data-testid="review-notext">
           {!noTextAtAll && (
             <>
@@ -138,15 +174,21 @@ export function ReviewPanel({
         </p>
       )}
 
-      {findings.length > 0 && (
+      {!single && findings.length > 0 && (
         <button type="button" className="btn primary review-all" disabled={pending.length === 0} onClick={onAcceptAll}>
           Redact all{pending.length > 0 ? ` (${pending.length})` : ""}
         </button>
       )}
 
+      {!single && phone && findings.length > 0 && (
+        <p className="review-note" data-testid="review-tap-hint">
+          Tap an item to see it on the page.
+        </p>
+      )}
+
       {findings.length > 0 && (
         <ul className="review-list">
-          {findings.map((f) => {
+          {(single ? [findings[focusedAt]!] : findings).map((f) => {
             const s = status(f);
             return (
               <li
@@ -156,7 +198,7 @@ export function ReviewPanel({
                 data-detector={f.detectorId}
                 data-status={s}
               >
-                <button type="button" className="finding-show" onClick={() => onShow(f)} title="Show on the page">
+                <button type="button" className="finding-show" onClick={() => show(f)} title="Show on the page">
                   <span className="finding-type">
                     {f.label} · Page {f.page + 1}
                   </span>
@@ -189,10 +231,12 @@ export function ReviewPanel({
         </ul>
       )}
 
-      <p className="review-note">
-        Looks for: {LOOKS_FOR}. Names, addresses, signatures and photos aren’t detected, and anything else can be
-        missed too.
-      </p>
+      {!single && (
+        <p className="review-note">
+          Looks for: {LOOKS_FOR}. Names, addresses, signatures and photos aren’t detected, and anything else can be
+          missed too.
+        </p>
+      )}
     </aside>
   );
 }

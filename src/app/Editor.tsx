@@ -289,6 +289,7 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
       scan={scan}
       status={status}
       totalPages={doc.pages.length}
+      phone={phone}
       focusedId={focused?.id ?? null}
       onShow={(f) => {
         goTo(f.page);

@@ -100,6 +100,12 @@ export function ExportDialog({ doc, boxes, unreviewed, onClose }: Props) {
             <p className={`verdict ${state.report.ok ? "ok" : "fail"}`} data-testid="verify-summary" role="status">
               {summaryLine(state.report)}
             </p>
+            {state.report.ok && (
+              <p className="muted" data-testid="verify-scope">
+                This checks your boxes and the new file. It can’t tell whether something sensitive was left uncovered, so
+                look over every page before you share it.
+              </p>
+            )}
             {boxes.length === 0 && (
               <p className="muted">
                 You haven’t drawn any boxes, so nothing is blacked out. The file is still flattened and cleaned.

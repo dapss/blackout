@@ -54,7 +54,15 @@ interface Ink {
  * Ink of each word, read from the rendered page canvas inside the word's true advance range.
  * This is independent of the app's snapping: it's what a reader would see.
  */
-function readInk(page: Page, pageWidth: number, lines: Pick<TruthLine, "baseline" | "size" | "words">[]) {
+async function readInk(page: Page, pageWidth: number, lines: Pick<TruthLine, "baseline" | "size" | "words">[]) {
+  // A canvas still being painted has see-through pixels, which would read as black ink.
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>(".page-canvas");
+    if (!canvas?.width) return false;
+    const { data } = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height);
+    for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return false;
+    return true;
+  });
   return page.evaluate(
     ({ lines, pageWidth }) => {
       const canvas = document.querySelector<HTMLCanvasElement>(".page-canvas")!;

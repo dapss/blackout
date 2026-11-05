@@ -54,19 +54,19 @@ test("a 20-page PDF exports quickly without freezing the UI", async ({ page }) =
     }, 16);
   });
   const started = Date.now();
-  // Progress is reported page by page while the export runs.
-  const statuses = new Set<string>();
-  const watcher = (async () => {
-    for (let i = 0; i < 400; i++) {
-      const t = await page.getByTestId("export-status").textContent({ timeout: 100 }).catch(() => null);
-      if (t) statuses.add(t);
-      if (await page.getByTestId("verify-summary").isVisible()) break;
-      await page.waitForTimeout(50);
-    }
-  })();
+  // Progress is reported page by page while the export runs. Watched from inside the page, because
+  // polling from here can miss updates on a fast machine.
+  await page.evaluate(() => {
+    const w = window as unknown as { __statuses: Set<string> };
+    w.__statuses = new Set();
+    new MutationObserver(() => {
+      const t = document.querySelector('[data-testid="export-status"]')?.textContent;
+      if (t) w.__statuses.add(t);
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+  });
   const { bytes } = await exportAndDownload(page, 2);
   const elapsed = Date.now() - started;
-  await watcher;
+  const statuses = await page.evaluate(() => [...(window as unknown as { __statuses: Set<string> }).__statuses]);
   const maxGap = await page.evaluate(() => {
     const w = window as unknown as { __maxGap: number; __beat: number };
     clearInterval(w.__beat);
@@ -78,7 +78,7 @@ test("a 20-page PDF exports quickly without freezing the UI", async ({ page }) =
   expect(out.items).toBe(0);
   console.log(`20 pages exported+verified in ${elapsed} ms; longest main-thread stall ${Math.round(maxGap)} ms`);
   expect(elapsed).toBeLessThan(60_000);
-  expect([...statuses].filter((s) => / of 20/.test(s)).length).toBeGreaterThan(3);
+  expect(statuses.filter((s) => / of 20/.test(s)).length).toBeGreaterThan(3);
   // The UI never locks up: the main thread is never blocked for more than half a second.
   expect(maxGap).toBeLessThan(500);
 });
