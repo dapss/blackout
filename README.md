@@ -4,8 +4,6 @@
 
 Online tools like iLovePDF, Smallpdf or Acrobat online make you upload a document before they can redact it. Blackout does the whole job on your own device: the file is opened, flattened and checked inside the browser tab, and the page is not allowed to send data anywhere.
 
-Made by [Mochamad Daffa](https://github.com/dapss). Licensed under [Apache-2.0](LICENSE).
-
 **Try it: [blackout-redact.pages.dev](https://blackout-redact.pages.dev)**
 
 ## What it does
@@ -98,6 +96,6 @@ src/
 
 Pages are rendered and encoded one at a time and every canvas is released straight away, so long PDFs don't run out of memory. Encoding and assembly run in a Web Worker with `OffscreenCanvas` (with a main-thread fallback for older browsers). pdf.js parses in its own worker and runs with no font, CMap or wasm URLs, so it never fetches anything.
 
-## License and credit
+## License
 
-Apache-2.0. Copyright 2026 Mochamad Daffa. If you reuse or redistribute this code, keep the [NOTICE](NOTICE) file.
+[Apache-2.0](LICENSE)

@@ -17,13 +17,12 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("shows the privacy banner and the author credit", async ({ page }) => {
+test("shows the privacy banner and links to the source", async ({ page }) => {
   await expect(page.getByTestId("privacy-banner")).toContainText("Your file never leaves this device");
   await page.getByText("How to verify").click();
   await expect(page.getByText("airplane mode")).toBeVisible();
   const footer = page.locator("footer");
-  await expect(footer.getByRole("link", { name: "Mochamad Daffa" })).toHaveAttribute("href", /github\.com\/dapss/);
-  await expect(footer.getByRole("link", { name: "Source on GitHub" })).toBeVisible();
+  await expect(footer.getByRole("link", { name: "Source on GitHub" })).toHaveAttribute("href", "https://github.com/dapss/blackout");
   await expect(footer.getByRole("link", { name: /Apache-2.0/ })).toBeVisible();
   // The build shows which commit it came from, linked to the source.
   const version = footer.getByTestId("build-version");

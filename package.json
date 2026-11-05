@@ -4,7 +4,6 @@
   "private": true,
   "description": "Redact PDFs and images entirely in your browser. Nothing is uploaded.",
   "license": "Apache-2.0",
-  "author": "Mochamad Daffa",
   "type": "module",
   "packageManager": "pnpm@12.15.0",
   "scripts": {

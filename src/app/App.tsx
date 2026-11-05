@@ -7,8 +7,6 @@ import {
   APP_COMMIT,
   APP_RELEASED,
   APP_VERSION,
-  AUTHOR_NAME,
-  AUTHOR_URL,
   COMMIT_URL,
   LICENSE_URL,
   LIVE_URL,
@@ -169,12 +167,6 @@ export function App() {
 
       {!phoneEditing && (
       <footer className="footer">
-        <span>
-          Made by{" "}
-          <a href={AUTHOR_URL} rel="noopener noreferrer" target="_blank">
-            {AUTHOR_NAME}
-          </a>
-        </span>
         <a href={REPO_URL} rel="noopener noreferrer" target="_blank">
           Source on GitHub
         </a>
