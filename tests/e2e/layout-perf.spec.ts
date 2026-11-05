@@ -20,6 +20,19 @@ test("fits a phone-width screen without horizontal scrolling", async ({ page }) 
   expect((await pdfTextItems(bytes)).items).toBe(0);
 });
 
+test.describe("on a 1280px laptop screen", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
+  // Linux fonts run wider than Windows and macOS ones, so CI is what catches this.
+  test("the toolbar stays on one row, even on a PDF with a page switcher", async ({ page }) => {
+    await page.goto("/");
+    await openFixture(page, "long-20.pdf");
+    const toolbar = (await page.getByRole("toolbar", { name: "Editing tools" }).boundingBox())!;
+    expect(toolbar.height).toBeLessThan(60);
+    await expect(page.getByTestId("export-button")).toHaveText("Export");
+  });
+});
+
 test("a 20-page PDF exports quickly without freezing the UI", async ({ page }) => {
   await page.goto("/");
   await openFixture(page, "long-20.pdf");

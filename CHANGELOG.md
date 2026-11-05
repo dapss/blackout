@@ -16,6 +16,7 @@ bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and 
 
 ### Changed
 - A simpler footer: the link to the source is now the only credit on the page.
+- The desktop export button now just says "Export", which keeps the toolbar on one row.
 
 ## 0.1.4 (2026-11-05)
 

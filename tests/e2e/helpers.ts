@@ -12,7 +12,11 @@ export const FIXTURES = fileURLToPath(new URL("../fixtures", import.meta.url));
  */
 async function startInDraw(page: Page) {
   await page.getByRole("radio", { name: "Draw" }).evaluate((el) => (el as HTMLElement).click());
-  await page.keyboard.press("Escape");
+  // Keep pressing: right after the file opens, the page may not be listening for keys yet.
+  await expect(async () => {
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("mode-tip")).toHaveCount(0, { timeout: 250 });
+  }).toPass();
 }
 
 export async function openFixture(page: Page, name: string) {
@@ -34,11 +38,13 @@ export async function drawBox(page: Page, fx0: number, fy0: number, fx1: number,
   const layer = page.getByTestId("page-layer");
   await layer.scrollIntoViewIfNeeded();
   let r = (await layer.boundingBox())!;
-  // Scroll so the whole drag is on screen.
+  // Scroll so the whole drag is on screen, and not under the toolbar, which sticks to the top.
   const vh = page.viewportSize()!.height;
+  const bar = page.getByRole("toolbar", { name: "Editing tools" }); // not on the phone layout
+  const toolbar = (await bar.count()) ? await bar.boundingBox() : null;
   const top = r.y + r.height * Math.min(fy0, fy1);
   const bottom = r.y + r.height * Math.max(fy0, fy1);
-  if (top < 0 || bottom > vh) {
+  if (top < (toolbar ? toolbar.y + toolbar.height : 0) || bottom > vh) {
     await page.mouse.move(r.x + r.width / 2, Math.min(Math.max(r.y + 10, 10), vh - 10));
     await page.mouse.wheel(0, (top + bottom) / 2 - vh / 2);
     await page.waitForTimeout(150);

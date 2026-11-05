@@ -534,8 +534,14 @@ export function Editor({ doc, phone, onDirty, onOpenFile, onClose }: Props) {
           </label>
         </div>
 
-        <button type="button" className="btn primary" data-testid="export-button" onClick={() => setExporting(true)}>
-          Export redacted {doc.kind === "pdf" ? "PDF" : "image"}
+        <button
+          type="button"
+          className="btn primary"
+          data-testid="export-button"
+          onClick={() => setExporting(true)}
+          title={`Export a redacted copy of this ${doc.kind === "pdf" ? "PDF" : "image"}`}
+        >
+          Export
         </button>
       </div>
 
