@@ -19,6 +19,8 @@ const DOUBLE_TAP_PX = 30;
 const RENDER_SETTLE_MS = 150;
 /** A finger moving less than this (screen px) is tapping, not dragging. */
 const TAP_PX = 6;
+const COPY_ATTEMPTS = 5;
+const COPY_RETRY_MS = 100;
 const FIT_TOLERANCE = 1;
 
 type Drag =
@@ -120,16 +122,23 @@ export function PageView({
     const scale = renderZoom * dpr;
     const { w, h } = canvasSize(size, scale);
     const off = createCanvas(w, h);
+    const offCtx = get2d(off);
     doc
-      .draw(pageIndex, get2d(off), scale, ac.signal)
-      .then(() => {
+      .draw(pageIndex, offCtx, scale, ac.signal)
+      .then(async () => {
         if (ac.signal.aborted) return;
+        // Safari can draw later; reading a pixel makes it finish before the copy.
+        offCtx.getImageData(0, 0, 1, 1);
         visible.width = w;
         visible.height = h;
         const ctx = visible.getContext("2d")!;
-        ctx.drawImage(off, 0, 0);
-        // Safari can draw later; reading a pixel makes it finish before `off` is released below.
-        ctx.getImageData(0, 0, 1, 1);
+        // Safari occasionally leaves the copy blank. The page is opaque, so a clear pixel gives that away.
+        for (let attempt = 0; attempt < COPY_ATTEMPTS; attempt++) {
+          ctx.drawImage(off, 0, 0);
+          if (ctx.getImageData(w >> 1, h >> 1, 1, 1).data[3] === 255) break;
+          await new Promise((r) => setTimeout(r, COPY_RETRY_MS));
+          if (ac.signal.aborted) return;
+        }
         setRendering(false);
       })
       .catch(() => {

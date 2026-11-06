@@ -17,6 +17,33 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
+test("the page still shows when copying it to the screen fails at first", async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = CanvasRenderingContext2D.prototype.drawImage;
+    let failures = 2;
+    CanvasRenderingContext2D.prototype.drawImage = function (this: CanvasRenderingContext2D, ...args: unknown[]) {
+      if (this.canvas.classList.contains("page-canvas") && failures-- > 0) return;
+      (original as (...a: unknown[]) => void).apply(this, args);
+    };
+  });
+  await page.reload();
+  await openFixture(page, "dirty.pdf");
+  await expect
+    .poll(() =>
+      page.locator(".page-canvas").evaluate((c: HTMLCanvasElement) => {
+        const { data } = c.getContext("2d")!.getImageData(0, 0, c.width, c.height);
+        let opaque = true;
+        let ink = false;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] !== 255) opaque = false;
+          if (data[i]! < 128) ink = true;
+        }
+        return opaque && ink;
+      }),
+    )
+    .toBe(true);
+});
+
 test("shows the privacy banner and links to the source", async ({ page }) => {
   await expect(page.getByTestId("privacy-banner")).toContainText("Your file never leaves this device");
   await page.getByText("How to verify").click();
