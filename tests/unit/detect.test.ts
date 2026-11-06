@@ -192,9 +192,13 @@ describe("national IDs", () => {
     ["in.aadhaar", "2837 4651 0291"],
     ["in.pan", "ABCPE1234F"],
     ["br.cpf", "529.982.247-25"],
+    ["br.cpf", "111.444.777-35"],
     ["es.dni", "12345678Z"],
     ["es.dni", "12345678-Z"],
     ["es.nie", "X1234567L"],
+    ["gb.nino", "AB 11 11 11 A"],
+    ["fr.nir", "1 85 13 78 006 084 25"],
+    ["fr.nir", "7 85 05 78 006 084 82"],
     ["fr.nir", "1 85 05 78 006 084 91"],
     ["fr.nir", "1 85 05 2A 006 084 35"],
   ])("%s finds %s", (id, value) => finds(id, value, `Ref: ${value}, on file`));

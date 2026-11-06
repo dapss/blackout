@@ -114,7 +114,7 @@ export function isSsn(text: string): boolean {
 export function isNino(text: string): boolean {
   const n = text.replace(/ /g, "");
   if (/[DFIQUV]/.test(n[0]!) || /[DFIOQUV]/.test(n[1]!)) return false;
-  return !["BG", "GB", "NK", "KN", "TN", "NT", "ZZ"].includes(n.slice(0, 2)) && !/^[A-Z]{2}(\d)\1{5}/.test(n);
+  return !["BG", "GB", "NK", "KN", "TN", "NT", "ZZ"].includes(n.slice(0, 2));
 }
 
 const VERHOEFF_D = [
@@ -163,11 +163,9 @@ export function isNie(text: string): boolean {
   return DNI_LETTERS[Number(`${lead}${digitsOf(text)}`) % 23] === text[text.length - 1];
 }
 
-/** French NIR: sex, year, month, place, order and a mod-97 key. Corsica's 2A and 2B count as 19 and 18. */
+/** French NIR: only the mod-97 key is checked, since the month has many special codes. Corsica's 2A and 2B count as 19 and 18. */
 export function isNir(text: string): boolean {
   const n = text.replace(/ /g, "");
-  const month = Number(n.slice(3, 5));
-  if (month === 0 || (month > 12 && month < 20)) return false;
   const body = n.slice(0, 13).replace("2A", "19").replace("2B", "18");
   return 97 - Number(BigInt(body) % 97n) === Number(n.slice(13));
 }

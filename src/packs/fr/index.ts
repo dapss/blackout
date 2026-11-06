@@ -7,7 +7,7 @@ export const fr: Pack = {
     {
       id: "fr.nir",
       label: "French social security number",
-      pattern: /[12] ?\d{2} ?\d{2} ?(?:\d{2}|2[AB]) ?\d{3} ?\d{3} ?\d{2}/,
+      pattern: /[123478] ?\d{2} ?\d{2} ?(?:\d{2}|2[AB]) ?\d{3} ?\d{3} ?\d{2}/,
       validator: "nir",
     },
   ],
