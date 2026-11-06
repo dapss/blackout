@@ -53,7 +53,7 @@ function pageList(pages: number[]): string {
   return shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}` : shown[0]!;
 }
 
-const LOOKS_FOR = PACKS.flatMap((p) => p.detectors.map((d) => d.label)).join(", ");
+const LOOKS_FOR = [...new Set(PACKS.flatMap((p) => p.detectors.map((d) => d.label)))].join(", ");
 
 interface Props {
   scan: Scan;
@@ -232,8 +232,8 @@ export function ReviewPanel({
 
       {!single && (
         <p className="review-note">
-          Looks for: {LOOKS_FOR}. Names, addresses, signatures and photos aren’t detected, and anything else can be
-          missed too.
+          Looks for: {LOOKS_FOR}. Names, addresses and birth details are only found next to a label like Nama or
+          Address. Signatures and photos aren’t detected, and anything else can be missed too.
         </p>
       )}
     </aside>

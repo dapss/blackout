@@ -21,11 +21,27 @@ export interface Detector {
   loose?: boolean;
 }
 
+/** A value found by the label next to it, such as `Nama: Budi Santoso`, rather than by its format. */
+export interface Field {
+  id: string;
+  label: string;
+  /** What the label can say, matched whole and ignoring case. */
+  names: string[];
+  /** The value can run onto following lines, as addresses do. */
+  multiline?: boolean;
+  /** For fields with a known format: the value must look like this, and stays on one line. */
+  value?: RegExp;
+  validator?: ValidatorName;
+}
+
 export interface Pack {
   /** `<cc>` in `src/packs/<cc>`, or `intl` for formats used everywhere. */
   id: string;
   name: string;
   detectors: Detector[];
+  fields?: Field[];
+  /** Other labels, which end a value: `Nama: Budi Umur: 30` shouldn't take the age. */
+  otherLabels?: string[];
 }
 
 export const NUMBER_GROUPS = /\d+(?:[ \-‐-―]\d+)*/;

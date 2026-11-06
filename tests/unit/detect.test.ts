@@ -90,6 +90,8 @@ describe("NIK", () => {
 
 describe("NPWP", () => {
   it("finds the dotted layout", () => finds("id.npwp", "01.234.567.8-901.234", "NPWP: 01.234.567.8-901.234"));
+  it("finds the 16-digit layout, with a leading 0", () => finds("id.npwp", "001.234.567.8-901.234", "NPWP: 001.234.567.8-901.234"));
+  it("ignores three leading digits that aren't a 0", () => nothing("101.234.567.8-901.234"));
   it.each([
     ["bare digits", "012345678901234"],
     ["the wrong layout", "01.234.567.8.901.234"],
@@ -217,6 +219,100 @@ describe("findingsOnPage", () => {
   it("keeps words in reading order whatever order the PDF stores them in", () => {
     const [f] = findingsOnPage([word("example.com", 40), word("jane@", 10)], 0, page);
     expect(f!.text).toBe("jane@example.com");
+  });
+
+  describe("values found by their label", () => {
+    const row = (y: number, ...cells: [string, number][]) =>
+      cells.flatMap(([text, start]) => {
+        let x = start;
+        return text.split(" ").map((t) => {
+          const w = word(t, x, y);
+          x += w.w + 4;
+          return w;
+        });
+      });
+    const list = (...rows: Word[][]) => findingsOnPage(rows.flat(), 0, page).map((f) => [f.detectorId, f.text]);
+
+    it.each([
+      ["a colon", row(100, ["Nama: Budi Santoso", 10])],
+      ["a colon with a space", row(100, ["Nama : Budi Santoso", 10])],
+      ["a table row", row(100, ["Nama", 10], ["Budi Santoso", 200])],
+      ["a colon in a column of its own", row(100, ["Nama", 10], [":", 100], ["Budi Santoso", 200])],
+      ["a colon starting the value's column", row(100, ["Nama", 10], [": Budi Santoso", 200])],
+      ["a numbered line", row(100, ["1. Nama: Budi Santoso", 10])],
+      ["any letter case", row(100, ["NAMA: Budi Santoso", 10])],
+    ])("finds a name after %s", (_how, words) => {
+      expect(findingsOnPage(words, 0, page).map((f) => [f.detectorId, f.text])).toEqual([["id.name", "Budi Santoso"]]);
+    });
+
+    it("boxes only the value, not its label", () => {
+      const [f] = findingsOnPage(row(100, ["Nama:", 10], ["Budi", 60]), 0, page);
+      expect(f!.rects).toHaveLength(1);
+      expect(f!.rects[0]!.x).toBeGreaterThan(50);
+    });
+
+    it("ends a value at the next known label", () => {
+      expect(list(row(100, ["Nama: Budi Umur: 30 Alamat: Jl Merdeka", 10]))).toEqual([
+        ["id.name", "Budi"],
+        ["id.address", "Jl Merdeka"],
+      ]);
+    });
+
+    it("follows an address onto lines lined up under it", () => {
+      expect(
+        list(row(100, ["Alamat", 10], [": Jl Merdeka 10", 100]), row(117, ["RT 01 RW 02", 110]), row(134, ["Bandung", 110])),
+      ).toEqual([["id.address", "Jl Merdeka 10 RT 01 RW 02 Bandung"]]);
+      expect(list(row(100, ["Alamat: Jl Merdeka 10,", 10]), row(117, ["Bandung 40111", 10]))).toEqual([
+        ["id.address", "Jl Merdeka 10, Bandung 40111"],
+      ]);
+    });
+
+    it("doesn't take the next row of a table or a line after a finished address", () => {
+      expect(list(row(100, ["Nama", 10], ["Budi", 200]), row(117, ["Jabatan", 10], ["Direktur", 200]))).toEqual([["id.name", "Budi"]]);
+      expect(list(row(100, ["Alamat: Jl Merdeka 10", 10]), row(117, ["Perjanjian ini berlaku", 10]))).toEqual([["id.address", "Jl Merdeka 10"]]);
+    });
+
+    it("gives every line of a followed value a box", () => {
+      const [f] = findingsOnPage([...row(100, ["Alamat", 10], ["Jl Merdeka", 100]), ...row(117, ["Bandung", 100])], 0, page);
+      expect(f!.rects).toHaveLength(2);
+    });
+
+    it.each([
+      ["a sentence", row(100, ["Silakan isi Nama: Budi", 10])],
+      ["a longer label", row(100, ["Nama Perusahaan: PT Maju", 10])],
+      ["a label ending in the same word", row(100, ["File Name: report.pdf", 10])],
+      ["a word starting with the label", row(100, ["Namanya: Budi", 10])],
+      ["a blank to fill in", row(100, ["Nama: ________", 10])],
+      ["dots to fill in", row(100, ["Nama : ........", 10])],
+      ["a table's header row", row(100, ["Nama", 10], ["Alamat", 200], ["Telepon", 400])],
+      ["a header row ending in another column", row(100, ["Nama", 10], ["Alamat", 200], ["Tahun", 400])],
+      ["a label with nothing after it", row(100, ["Nama", 10])],
+      ["the label word in plain text", row(100, ["Nama Budi Santoso", 10])],
+    ])("ignores %s", (_why, words) => {
+      expect(findingsOnPage(words, 0, page)).toEqual([]);
+    });
+
+    it("doesn't list what a format already found, but keeps the rest of the value", () => {
+      expect(list(row(100, ["NIK: 3201014512900001", 10]))).toEqual([["id.nik", "3201014512900001"]]);
+      expect(list(row(100, ["NPWP: 01.234.567.8-901.234", 10]))).toEqual([["id.npwp", "01.234.567.8-901.234"]]);
+      const both = findingsOnPage(row(100, ["Alamat: Jl Merdeka a@example.com", 10]), 0, page);
+      expect(both.map((f) => f.detectorId).sort()).toEqual(["id.address", "intl.email"]);
+      expect(both.every((f) => f.rects.length === 1)).toBe(true);
+    });
+
+    it("finds bare NPWP digits next to the label only", () => {
+      expect(list(row(100, ["NPWP: 0012345678012345", 10]))).toEqual([["id.npwp-labelled", "0012345678012345"]]);
+      expect(list(row(100, ["NPWP: 012345678012345", 10]))).toEqual([["id.npwp-labelled", "012345678012345"]]);
+      expect(list(row(100, ["NPWP: 12345", 10]))).toEqual([]);
+      expect(list(row(100, ["NPWP: sedang diurus", 10]))).toEqual([]);
+      expect(list(row(100, ["Referensi: 012345678012345", 10]))).toEqual([]);
+    });
+
+    it("finds English labels and birth details", () => {
+      expect(list(row(100, ["Full Name: Jane Doe", 10]))).toEqual([["intl.name", "Jane Doe"]]);
+      expect(list(row(100, ["Date of Birth: 1 May 1990", 10]))).toEqual([["intl.birth", "1 May 1990"]]);
+      expect(list(row(100, ["Tempat/Tgl Lahir: Bandung, 15-05-1990", 10]))).toEqual([["id.birth", "Bandung, 15-05-1990"]]);
+    });
   });
 
   describe("a value that wraps onto the next line", () => {

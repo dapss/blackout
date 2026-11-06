@@ -90,6 +90,30 @@ test("a phone number that wraps is blacked out on both lines, and the export is 
   expect((await pdfTextItems(bytes)).items).toBe(0);
 });
 
+test("a labelled name and a wrapped address become boxes on the right words", async ({ page }) => {
+  const doc = await PDFDocument.create();
+  const p = doc.addPage([500, 300]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  p.drawText("Nama", { x: 40, y: 240, size: 12, font });
+  p.drawText(": Budi Santoso", { x: 140, y: 240, size: 12, font });
+  p.drawText("Alamat", { x: 40, y: 220, size: 12, font });
+  p.drawText(": Jl Merdeka 10", { x: 140, y: 220, size: 12, font });
+  p.drawText("Bandung 40111", { x: 150, y: 203, size: 12, font });
+  p.drawText("Harga sewa", { x: 40, y: 180, size: 12, font });
+  p.drawText(": Rp 4.500.000", { x: 140, y: 180, size: 12, font });
+  await page.goto("/");
+  await openBuffer(page, "form.pdf", "application/pdf", Buffer.from(await doc.save()));
+  await find(page);
+
+  await expect(page.getByTestId("finding")).toHaveCount(2);
+  await expect(finding(page, "id.name")).toContainText("Budi Santoso");
+  await expect(finding(page, "id.address")).toContainText("Jl Merdeka 10 Bandung 40111");
+  await page.getByRole("button", { name: /Redact all/ }).click();
+  await expect(page.getByTestId("box")).toHaveCount(3);
+  const { bytes } = await exportAndDownload(page, 3);
+  expect((await pdfTextItems(bytes)).items).toBe(0);
+});
+
 test("the wording doesn't promise it found everything", async ({ page }) => {
   await openDetect(page);
   const summary = page.getByTestId("review-summary");

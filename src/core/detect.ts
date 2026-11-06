@@ -1,6 +1,7 @@
-// Finds sensitive values in a page's text, line by line and again across lines that wrap.
-import { DETECTORS } from "../packs";
-import type { Detector } from "../packs/types";
+// Finds sensitive values in a page's text: by format, line by line and again across lines that wrap,
+// and by the label next to them.
+import { DETECTORS, FIELDS, OTHER_LABELS } from "../packs";
+import type { Detector, Field } from "../packs/types";
 import { validators } from "../packs/validators";
 import type { PageSize, Rect } from "./types";
 import { groupLines, lineRects, type Word, wordBox } from "./words";
@@ -182,7 +183,7 @@ function paragraphs(lines: Word[][]): Word[][][] {
 }
 
 interface Hit {
-  detector: Detector;
+  detector: Pick<Detector, "id" | "label">;
   text: string;
   words: Word[];
 }
@@ -215,12 +216,120 @@ function wrappedHits(lines: Word[][], detectors: Detector[]): Hit[] {
   return hits;
 }
 
+const LINES_FOLLOWED = { multiline: 4, single: 1 };
+
+const labelSource = (names: string[]) =>
+  [...names]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&").replace(/ /g, "\\s*"))
+    .join("|");
+
+/** Whole words at character positions [start, end) of a piece of text. */
+function wordsBetween(line: ReturnType<typeof lineText>, start: number, end: number): Word[] {
+  return [...new Set(line.wordAt.slice(start, end).filter((i) => i >= 0))].map((i) => line.words[i]!);
+}
+
+/**
+ * Values found by their label: `Nama: Budi`, `Nama : Budi` and a table's `Nama | Budi`. The label has
+ * to start a piece of text, so a sentence or `File Name:` doesn't count. A value ends at the next
+ * known label or the end of its column, and carries on to lines lined up under it.
+ */
+function fieldHits(lines: Word[][], fields: Field[], otherLabels: string[]): Hit[] {
+  const fieldNames = fields.flatMap((f) => f.names);
+  const known = labelSource([...fieldNames, ...otherLabels]);
+  const atStart = new RegExp(`^(?:[\\p{L}\\d]{1,2}[.)]\\s*)?(${known})\\s*(?::\\s*|$)`, "iu");
+  const inside = new RegExp(`(?<![\\p{L}\\p{N}])(${known})\\s*:\\s*`, "giu");
+  const isLabel = (text: string) => atStart.test(text) && text.replace(atStart, "") === "";
+  const fieldOf = (label: string) => {
+    const wanted = label.replace(/\s+/g, "").toLowerCase();
+    return fields.find((f) => f.names.some((n) => n.replace(/\s+/g, "").toLowerCase() === wanted));
+  };
+
+  const rows = lines.filter((l) => l[0]!.axis).map((l) => columnsOf(l).map(lineText));
+  const hits: Hit[] = [];
+
+  const follow = (start: Word, labelStart: Word, field: Field, row: number, first: ReturnType<typeof lineText>) => {
+    const words: Word[] = [];
+    let text = "";
+    let last = start;
+    let endsInComma = first.text.trimEnd().endsWith(",");
+    let from = row;
+    for (let n = 0; n < (field.multiline ? LINES_FOLLOWED.multiline : LINES_FOLLOWED.single); n++) {
+      // Only text that starts its line can carry on a value: anything to its left is a different row.
+      const next = rows
+        .map((r, i) => ({ piece: r[0]!, i }))
+        .filter(({ piece, i }) => {
+          if (i === from || !carriesOn([last], piece.words)) return false;
+          const w = piece.words[0]!;
+          const under = Math.abs(along(w) - along(start)) <= w.size;
+          const wrapped = !!field.multiline && endsInComma && Math.abs(along(w) - along(labelStart)) <= w.size;
+          return (under || wrapped) && !atStart.test(piece.text);
+        })
+        .sort((a, b) => (a.piece.words[0]!.base - b.piece.words[0]!.base) * nextLineDirection(start))[0];
+      if (!next) break;
+      words.push(...next.piece.words);
+      text += ` ${next.piece.text}`;
+      last = next.piece.words[0]!;
+      endsInComma = next.piece.text.trimEnd().endsWith(",");
+      from = next.i;
+    }
+    return { words, text };
+  };
+
+  rows.forEach((pieces, row) => {
+    pieces.forEach((piece, p) => {
+      const opening = piece.text.match(atStart);
+      if (!opening) return;
+      const labels: { name: string; start: number; end: number }[] = [
+        { name: opening[1]!, start: 0, end: opening[0].length },
+      ];
+      for (const m of piece.text.matchAll(inside)) {
+        if (m.index >= opening[0].length) labels.push({ name: m[1]!, start: m.index, end: m.index + m[0].length });
+      }
+      labels.forEach((label, i) => {
+        const field = fieldOf(label.name);
+        if (!field) return;
+        let line = piece;
+        let start = label.end;
+        let end = labels[i + 1]?.start ?? piece.text.length;
+        if (!piece.text.slice(start, end).trim()) {
+          // The value is in the next column, possibly after a colon standing on its own.
+          // After another label with no value of its own, this is a table's header row.
+          if (i < labels.length - 1 || (p > 0 && isLabel(pieces[p - 1]!.text))) return;
+          let q = p + 1;
+          let nextPiece = pieces[q];
+          if (nextPiece?.text.trim() === ":") nextPiece = pieces[++q];
+          if (!nextPiece || isLabel(nextPiece.text)) return;
+          line = nextPiece;
+          start = nextPiece.text.match(/^:\s*/)?.[0].length ?? 0;
+          end = nextPiece.text.length;
+        }
+        const raw = line.text.slice(start, end).trim();
+        if (!/[\p{L}\p{N}]/u.test(raw)) return;
+        if (field.value && !field.value.test(raw)) return;
+        if (field.validator && !validators[field.validator](raw)) return;
+        const words = wordsBetween(line, start, end);
+        if (!words.length) return;
+        const more = field.value ? { words: [], text: "" } : follow(words[0]!, piece.words[0]!, field, row, line);
+        hits.push({ detector: field, text: raw + more.text, words: [...words, ...more.words] });
+      });
+    });
+  });
+  return hits;
+}
+
 /**
  * A box covers each whole word a match touches, so nothing is left half-covered. A value that wraps
  * replaces the piece found on its first line, which could look complete: the start of a phone number
  * is a valid phone number. It can't take text from a separate value, so table rows stay separate.
  */
-export function findingsOnPage(words: Word[], page: number, size: PageSize, detectors: Detector[] = DETECTORS): Finding[] {
+export function findingsOnPage(
+  words: Word[],
+  page: number,
+  size: PageSize,
+  detectors: Detector[] = DETECTORS,
+  fields: Field[] = FIELDS,
+): Finding[] {
   const lines = groupLines(words)
     .map((l) => lineText(l).words)
     .sort((a, b) => Math.min(...a.map((w) => w.y)) - Math.min(...b.map((w) => w.y)));
@@ -237,6 +346,12 @@ export function findingsOnPage(words: Word[], page: number, size: PageSize, dete
     const touching = hits.filter((h) => h.words.some((w) => inside.has(w)));
     if (touching.length > 1 || touching.some((h) => !h.words.every((w) => inside.has(w)))) continue;
     hits = [...hits.filter((h) => !touching.includes(h)), wrapped];
+  }
+  // Formats are stronger evidence, so a label only adds what they didn't already find.
+  const taken = new Set(hits.flatMap((h) => h.words));
+  for (const hit of fieldHits(lines, fields, OTHER_LABELS)) {
+    const left = hit.words.filter((w) => !taken.has(w));
+    if (left.length) hits.push({ ...hit, words: left });
   }
 
   const position = new Map(lines.flatMap((l, i) => l.map((w, j): [Word, number] => [w, i * 1e6 + j])));

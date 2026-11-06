@@ -6,6 +6,18 @@ shows which version you are using.
 Versions follow [semantic versioning](https://semver.org/). Before 1.0, minor versions (0.2, 0.3)
 bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and polish.
 
+## Unreleased
+
+### Added
+- Find items now looks next to labels: Nama, Alamat, Tanggal Lahir, Name, Address, Date of Birth and
+  similar. It finds names, addresses and birth details in forms and tables, including an address that
+  runs over several lines. Every suggestion is yours to accept or reject, and text without a label
+  still isn't found.
+- The 16-digit NPWP: the dotted form with a leading 0, and bare digits next to an NPWP label.
+
+### Fixed
+- On Safari, a page could occasionally stay blank after opening.
+
 ## 0.2.1 (2026-11-05)
 
 ### Fixed

@@ -22,4 +22,10 @@ export const intl: Pack = {
       loose: true,
     },
   ],
+  fields: [
+    { id: "intl.name", label: "Name", names: ["Name", "Full Name", "Mother's Maiden Name"] },
+    { id: "intl.address", label: "Address", names: ["Address", "Home Address", "Street Address"], multiline: true },
+    { id: "intl.birth", label: "Birth details", names: ["Date of Birth", "DOB", "Birth Date", "Birthdate", "Place of Birth"] },
+  ],
+  otherLabels: ["Email", "E-mail", "Phone", "Tel", "Mobile", "Date", "Age", "Gender", "Sex", "Nationality", "Occupation", "Title"],
 };

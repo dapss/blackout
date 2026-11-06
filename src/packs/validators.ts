@@ -90,7 +90,14 @@ export function isNik(text: string): boolean {
 /** The dotted NPWP layout is distinctive enough on its own; there's no public checksum to test. */
 export function isNpwp(text: string): boolean {
   const digits = digitsOf(text);
-  return digits.length === 15 && !allSame(digits);
+  if (allSame(digits)) return false;
+  return digits.length === 15 || (digits.length === 16 && digits[0] === "0");
+}
+
+/** Next to an NPWP label, bare digits are enough, and a person's 16-digit NPWP is their NIK. */
+export function isNpwpLabelled(text: string): boolean {
+  const digits = digitsOf(text);
+  return (digits.length === 15 || digits.length === 16) && !allSame(digits);
 }
 
 export function isEmail(text: string): boolean {
@@ -120,6 +127,7 @@ export const validators = {
   iban: isIban,
   nik: isNik,
   npwp: isNpwp,
+  npwpLabelled: isNpwpLabelled,
   email: isEmail,
   phone: isPhone,
 };

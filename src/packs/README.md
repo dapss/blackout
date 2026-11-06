@@ -23,6 +23,10 @@ See `types.ts` for what each field means.
 3. List the pack in `index.ts`. Earlier detectors win when two match the same text, so detectors with real checks go first. Mark a detector with no real check `loose`, so it runs last.
 4. Add tests to `tests/unit/detect.test.ts`, with values that must not be flagged as well as ones that must. Use made-up values, never real people's numbers.
 
+## Labels
+
+A pack can also list `fields`: values found by the label next to them, for things with no format of their own, such as names. `otherLabels` are labels that aren't sensitive themselves but end a value. A label must start a piece of text, so a word in a sentence doesn't count. Use the exact wording forms use, because a broad label fills the panel with wrong findings.
+
 ## What makes a good detector
 
 - **Strict beats broad.** A panel full of wrong findings teaches people to click "Redact all" without reading. If a format has no checksum, require a distinctive layout or check that its parts make sense. A bare string of digits isn't enough.
