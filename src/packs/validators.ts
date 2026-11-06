@@ -100,6 +100,78 @@ export function isNpwpLabelled(text: string): boolean {
   return (digits.length === 15 || digits.length === 16) && !allSame(digits);
 }
 
+/** The ranges the US has never issued, and two numbers made famous by printed samples. */
+export function isSsn(text: string): boolean {
+  const d = digitsOf(text);
+  if (d.length !== 9 || allSame(d)) return false;
+  const area = Number(d.slice(0, 3));
+  if (area === 0 || area === 666 || area >= 900) return false;
+  if (d.slice(3, 5) === "00" || d.slice(5) === "0000") return false;
+  return d !== "078051120" && d !== "219099999";
+}
+
+/** UK National Insurance prefixes exclude certain letters and a few reserved pairs. */
+export function isNino(text: string): boolean {
+  const n = text.replace(/ /g, "");
+  if (/[DFIQUV]/.test(n[0]!) || /[DFIOQUV]/.test(n[1]!)) return false;
+  return !["BG", "GB", "NK", "KN", "TN", "NT", "ZZ"].includes(n.slice(0, 2)) && !/^[A-Z]{2}(\d)\1{5}/.test(n);
+}
+
+const VERHOEFF_D = [
+  "0123456789", "1234067895", "2340178956", "3401289567", "4012395678",
+  "5987604321", "6598710432", "7659821043", "8765932104", "9876543210",
+].map((row) => [...row].map(Number));
+const VERHOEFF_P = [
+  "0123456789", "1576283094", "5803796142", "8916043527", "9453126870",
+  "4286573901", "2793806415", "7046913258",
+].map((row) => [...row].map(Number));
+
+/** Aadhaar: 12 digits, not starting with 0 or 1, with a Verhoeff check digit. */
+export function isAadhaar(text: string): boolean {
+  const d = digitsOf(text);
+  if (d.length !== 12 || /^[01]/.test(d) || repeating(d)) return false;
+  let c = 0;
+  [...d].reverse().forEach((ch, i) => {
+    c = VERHOEFF_D[c]![VERHOEFF_P[i % 8]![Number(ch)]!]!;
+  });
+  return c === 0;
+}
+
+/** CPF: 9 digits and two mod-11 check digits. */
+export function isCpf(text: string): boolean {
+  const d = digitsOf(text);
+  if (d.length !== 11 || allSame(d)) return false;
+  const check = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
+    const r = (sum * 10) % 11;
+    return (r === 10 ? 0 : r) === Number(d[len]);
+  };
+  return check(9) && check(10);
+}
+
+const DNI_LETTERS = "TRWAGMYFPDXBNJZSQVHLCKE";
+
+export function isDni(text: string): boolean {
+  const d = digitsOf(text);
+  return !allSame(d) && DNI_LETTERS[Number(d) % 23] === text[text.length - 1];
+}
+
+/** NIE: a DNI whose first letter stands for a leading digit (X 0, Y 1, Z 2). */
+export function isNie(text: string): boolean {
+  const lead = "XYZ".indexOf(text[0]!);
+  return DNI_LETTERS[Number(`${lead}${digitsOf(text)}`) % 23] === text[text.length - 1];
+}
+
+/** French NIR: sex, year, month, place, order and a mod-97 key. Corsica's 2A and 2B count as 19 and 18. */
+export function isNir(text: string): boolean {
+  const n = text.replace(/ /g, "");
+  const month = Number(n.slice(3, 5));
+  if (month === 0 || (month > 12 && month < 20)) return false;
+  const body = n.slice(0, 13).replace("2A", "19").replace("2B", "18");
+  return 97 - Number(BigInt(body) % 97n) === Number(n.slice(13));
+}
+
 export function isEmail(text: string): boolean {
   const [local, domain] = text.split("@") as [string, string];
   if (local.startsWith(".") || local.endsWith(".") || text.includes("..")) return false;
@@ -128,6 +200,13 @@ export const validators = {
   nik: isNik,
   npwp: isNpwp,
   npwpLabelled: isNpwpLabelled,
+  ssn: isSsn,
+  nino: isNino,
+  aadhaar: isAadhaar,
+  cpf: isCpf,
+  dni: isDni,
+  nie: isNie,
+  nir: isNir,
   email: isEmail,
   phone: isPhone,
 };

@@ -1,6 +1,6 @@
 # Detection packs
 
-Each folder is one pack: `src/packs/<cc>/index.ts` for a country, `intl` for formats used everywhere. A pack is a list of detectors:
+Each folder is one pack: `src/packs/<cc>/index.ts` for a country or language, `intl` for formats used everywhere. A pack is a list of detectors:
 
 ```ts
 import { NUMBER_GROUPS, type Pack } from "../types";

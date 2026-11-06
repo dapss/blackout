@@ -9,10 +9,12 @@ bring the larger new features and patch versions (0.1.1, 0.1.2) bring fixes and 
 ## Unreleased
 
 ### Added
-- Find items now looks next to labels: Nama, Alamat, Tanggal Lahir, Name, Address, Date of Birth and
-  similar. It finds names, addresses and birth details in forms and tables, including an address that
+- Find items now looks next to labels, in English, Indonesian, Spanish, French, German, Portuguese and
+  Italian. It finds names, addresses and birth details in forms and tables, including an address that
   runs over several lines. Every suggestion is yours to accept or reject, and text without a label
   still isn't found.
+- More ID numbers: US Social Security, UK National Insurance, Aadhaar and PAN (India), CPF (Brazil),
+  DNI and NIE (Spain), and the French social security number.
 - The 16-digit NPWP: the dotted form with a leading 0, and bare digits next to an NPWP label.
 
 ### Fixed

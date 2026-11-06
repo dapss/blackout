@@ -232,8 +232,9 @@ export function ReviewPanel({
 
       {!single && (
         <p className="review-note">
-          Looks for: {LOOKS_FOR}. Names, addresses and birth details are only found next to a label like Nama or
-          Address. Signatures and photos aren’t detected, and anything else can be missed too.
+          Looks for: {LOOKS_FOR}. Names, addresses and birth details are only found next to a label, in English,
+          Indonesian, Spanish, French, German, Portuguese or Italian. Signatures and photos aren’t detected, and
+          anything else can be missed too.
         </p>
       )}
     </aside>

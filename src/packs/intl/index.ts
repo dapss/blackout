@@ -23,7 +23,7 @@ export const intl: Pack = {
     },
   ],
   fields: [
-    { id: "intl.name", label: "Name", names: ["Name", "Full Name", "Mother's Maiden Name"] },
+    { id: "intl.name", label: "Name", names: ["Name", "Full Name", "First Name", "Last Name", "Middle Name", "Given Name", "Family Name", "Surname", "Mother's Maiden Name", "Mother’s Maiden Name"] },
     { id: "intl.address", label: "Address", names: ["Address", "Home Address", "Street Address"], multiline: true },
     { id: "intl.birth", label: "Birth details", names: ["Date of Birth", "DOB", "Birth Date", "Birthdate", "Place of Birth"] },
   ],

@@ -150,7 +150,6 @@ describe("phone numbers", () => {
     ["a date with a leading zero", "01-02-2024"],
     ["a date with dots", "01.02.2024"],
     ["a date and time", "01 02 2024 1530"],
-    ["a US social security layout", "123-45-6789"],
     ["short numbers", "12345"],
     ["ten bare digits", "1234567890"],
     ["a bare 16-digit number", "1234567890123456"],
@@ -182,6 +181,48 @@ describe("packs", () => {
     const started = performance.now();
     for (const line of ["1 ".repeat(50_000), "a.".repeat(50_000), "A1".repeat(50_000), "+1 ".repeat(30_000), "(0".repeat(50_000)]) findMatches(line);
     expect(performance.now() - started).toBeLessThan(5000);
+  });
+});
+
+describe("national IDs", () => {
+  it.each([
+    ["us.ssn", "123-45-6789"],
+    ["gb.nino", "AB 12 34 56 C"],
+    ["gb.nino", "AB123456C"],
+    ["in.aadhaar", "2837 4651 0291"],
+    ["in.pan", "ABCPE1234F"],
+    ["br.cpf", "529.982.247-25"],
+    ["es.dni", "12345678Z"],
+    ["es.dni", "12345678-Z"],
+    ["es.nie", "X1234567L"],
+    ["fr.nir", "1 85 05 78 006 084 91"],
+    ["fr.nir", "1 85 05 2A 006 084 35"],
+  ])("%s finds %s", (id, value) => finds(id, value, `Ref: ${value}, on file`));
+
+  it.each([
+    ["an SSN in the 900s", "912-34-5678"],
+    ["the 666 area", "666-12-3456"],
+    ["an SSN with an empty group", "123-00-4567"],
+    ["bare 9 digits", "123456789"],
+    ["a NINO with a banned first letter", "QQ123456C"],
+    ["a reserved NINO prefix", "GB123456C"],
+    ["a NINO with a bad suffix", "AB123456E"],
+    ["Aadhaar failing its check", "2345 6789 0123"],
+    ["Aadhaar starting with 1", "1234 5678 9012"],
+    ["bare 12 digits", "283746510291"],
+    ["a PAN with a bad fourth letter", "ABCDE1234F"],
+    ["a CPF failing its check", "529.982.247-26"],
+    ["a repeated CPF", "111.111.111-11"],
+    ["a DNI with the wrong letter", "12345678A"],
+    ["a NIE with the wrong letter", "X1234567A"],
+    ["a NIR with the wrong key", "1 85 05 78 006 084 92"],
+  ])("ignores %s", (_why, value) => nothing(value));
+
+  it("a product code isn't a PAN inside a longer word", () => nothing("XABCPE1234F"));
+
+  it("doesn't call a number starting with 0 an SSN", () => {
+    expect(found("000-12-3456").map((f) => f[0])).not.toContain("us.ssn");
+    expect(found("078-05-1120").map((f) => f[0])).not.toContain("us.ssn");
   });
 });
 
@@ -306,6 +347,33 @@ describe("findingsOnPage", () => {
       expect(list(row(100, ["NPWP: 12345", 10]))).toEqual([]);
       expect(list(row(100, ["NPWP: sedang diurus", 10]))).toEqual([]);
       expect(list(row(100, ["Referensi: 012345678012345", 10]))).toEqual([]);
+    });
+
+    it.each([
+      ["Nombre: Ana García", "es.name", "Ana García"],
+      ["Dirección: Calle Mayor 5", "es.address", "Calle Mayor 5"],
+      ["Fecha de Nacimiento: 15/05/1990", "es.birth", "15/05/1990"],
+      ["Prénom : Claire", "fr.name", "Claire"],
+      ["Adresse : 5 Rue de la Paix", "fr.address", "5 Rue de la Paix"],
+      ["Date de Naissance : 15/05/1990", "fr.birth", "15/05/1990"],
+      ["Nachname: Müller", "de.name", "Müller"],
+      ["Anschrift: Hauptstraße 5", "de.address", "Hauptstraße 5"],
+      ["Geburtsdatum: 15.05.1990", "de.birth", "15.05.1990"],
+      ["Nome Completo: João Silva", "pt.name", "João Silva"],
+      ["Endereço: Rua Augusta 5", "pt.address", "Rua Augusta 5"],
+      ["Data de Nascimento: 15/05/1990", "pt.birth", "15/05/1990"],
+      ["Cognome: Rossi", "it.name", "Rossi"],
+      ["Indirizzo: Via Roma 5", "it.address", "Via Roma 5"],
+      ["Codice Fiscale: RSSMRA90E15H501X", "it.tax", "RSSMRA90E15H501X"],
+      ["SSN: 123456789", "us.ssn-labelled", "123456789"],
+      ["CPF: 52998224725", "br.cpf-labelled", "52998224725"],
+    ])("reads %s", (text, id, value) => {
+      expect(list(row(100, [text, 10]))).toEqual([[id, value]]);
+    });
+
+    it("stops at labels in other languages too", () => {
+      expect(list(row(100, ["Nombre: Ana Edad: 30", 10]))).toEqual([["es.name", "Ana"]]);
+      expect(list(row(100, ["Nachname: Müller Beruf: Lehrer", 10]))).toEqual([["de.name", "Müller"]]);
     });
 
     it("finds English labels and birth details", () => {
