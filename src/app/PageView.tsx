@@ -126,7 +126,10 @@ export function PageView({
         if (ac.signal.aborted) return;
         visible.width = w;
         visible.height = h;
-        visible.getContext("2d")!.drawImage(off, 0, 0);
+        const ctx = visible.getContext("2d")!;
+        ctx.drawImage(off, 0, 0);
+        // Safari can draw later; reading a pixel makes it finish before `off` is released below.
+        ctx.getImageData(0, 0, 1, 1);
         setRendering(false);
       })
       .catch(() => {
